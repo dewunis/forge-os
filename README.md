@@ -101,6 +101,10 @@ python scripts/forgeos.py install --tool all --scope local --target /chemin/du/p
 
 Consultez [docs/installation.md](docs/installation.md) pour les chemins, les sauvegardes, les codes de résultat et les exemples Windows, macOS et Linux.
 
+Le workflow Git, les gates de validation et la procédure de publication sont
+décrits dans [docs/release-process.md](docs/release-process.md). Les changements
+livrables sont récapitulés dans [CHANGELOG.md](CHANGELOG.md).
+
 ## Utilisation et maintenance
 
 ```shell
@@ -149,3 +153,7 @@ Les tests de l’installateur utilisent uniquement des répertoires temporaires.
 4. Ajoutez ou adaptez les tests isolés pour toute évolution de l’installateur.
 5. Exécutez toutes les validations ci-dessus et documentez uniquement les résultats réellement observés.
 6. Ne modifiez pas les conventions du code applicatif au nom des conventions internes ForgeOS.
+
+Les nouveaux commits suivent Conventional Commits et transitent par `dev`. La
+promotion vers `main`, la création de tags et la publication de releases restent
+soumises aux revues et autorisations décrites dans la procédure de release.
