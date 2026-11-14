@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "writer": "cto",
+  "active_mission": null,
+  "last_completed_mission": {
+    "id": "022",
+    "title": "Cross-platform documentation and installation",
+    "status": "completed"
+  },
+  "updated_at": "2026-11-14T17:40:16Z"
+}

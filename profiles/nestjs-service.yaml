@@ -1,0 +1,10 @@
+id: nestjs-service
+status: catalog-only
+rules:
+  preserve-existing-dependencies: true
+  require-manifest-detection: true
+  prohibit-automatic-upgrades: true
+stack:
+  backend: nestjs
+  language: typescript
+  testing: jest

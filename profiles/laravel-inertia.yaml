@@ -1,0 +1,11 @@
+id: laravel-inertia
+status: catalog-only
+rules:
+  preserve-existing-dependencies: true
+  require-manifest-detection: true
+  prohibit-automatic-upgrades: true
+stack:
+  backend: laravel
+  frontend: inertia-react-or-vue
+  language: php-and-typescript
+  ui: shadcn-ui-when-react

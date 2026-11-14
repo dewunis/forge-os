@@ -1,0 +1,11 @@
+id: python-ai
+status: catalog-only
+rules:
+  preserve-existing-dependencies: true
+  require-manifest-detection: true
+  prohibit-automatic-upgrades: true
+stack:
+  backend: fastapi
+  language: python
+  ai: openai-sdk-when-needed
+  testing: pytest

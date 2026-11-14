@@ -1,0 +1,12 @@
+id: full-product
+status: catalog-only
+rules:
+  preserve-existing-dependencies: true
+  require-manifest-detection: true
+  prohibit-automatic-upgrades: true
+stack:
+  backend: laravel-api
+  frontend: nextjs-web
+  mobile: expo-mobile
+  database: postgresql
+  cache: redis-when-needed

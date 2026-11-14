@@ -1,0 +1,16 @@
+# ForgeOS Codex CLI project-level configuration.
+# Use the canonical AGENTS.md instruction file supported by Codex.
+# Effective discovery must still be verified with the installed CLI.
+project_doc_max_bytes = 32768
+
+# Ask approval for tasks that leave the workspace or require elevated access.
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+# Primary model for the CTO and orchestration.
+model_reasoning_effort = "medium"
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 3
+interrupt_message = true

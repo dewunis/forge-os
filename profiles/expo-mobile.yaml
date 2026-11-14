@@ -1,0 +1,14 @@
+id: expo-mobile
+status: catalog-only
+rules:
+  preserve-existing-dependencies: true
+  require-manifest-detection: true
+  prohibit-automatic-upgrades: true
+stack:
+  mobile: expo-react-native
+  language: typescript
+  router: expo-router
+  ui: react-native-reusables
+  styling: nativewind
+  testing: jest-and-maestro
+  offline: sqlite-when-needed

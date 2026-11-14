@@ -1,0 +1,13 @@
+id: laravel-api
+status: catalog-only
+rules:
+  preserve-existing-dependencies: true
+  require-manifest-detection: true
+  prohibit-automatic-upgrades: true
+stack:
+  backend: laravel
+  language: php
+  api: rest
+  auth: sanctum-when-applicable
+  testing: pest-or-phpunit
+  database: postgresql-or-mysql

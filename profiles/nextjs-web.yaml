@@ -1,0 +1,13 @@
+id: nextjs-web
+status: catalog-only
+rules:
+  preserve-existing-dependencies: true
+  require-manifest-detection: true
+  prohibit-automatic-upgrades: true
+stack:
+  frontend: nextjs
+  language: typescript
+  router: app-router-for-new-projects
+  ui: shadcn-ui
+  styling: tailwind-css
+  testing: vitest-and-playwright

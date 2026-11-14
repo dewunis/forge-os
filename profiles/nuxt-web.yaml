@@ -1,0 +1,11 @@
+id: nuxt-web
+status: catalog-only
+rules:
+  preserve-existing-dependencies: true
+  require-manifest-detection: true
+  prohibit-automatic-upgrades: true
+stack:
+  frontend: nuxt
+  language: typescript
+  ui: vue
+  styling: tailwind-css-when-present
