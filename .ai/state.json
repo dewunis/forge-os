@@ -4,12 +4,12 @@
   "active_mission": {
     "id": "023",
     "title": "Git workflow and first release",
-    "status": "awaiting_approval"
+    "status": "ready_for_github_actions"
   },
   "last_completed_mission": {
     "id": "022",
     "title": "Cross-platform documentation and installation",
     "status": "completed"
   },
-  "updated_at": "2026-11-14T18:15:13Z"
+  "updated_at": "2026-11-14T23:01:51Z"
 }

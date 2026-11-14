@@ -145,6 +145,10 @@ Les tests de l’installateur utilisent uniquement des répertoires temporaires.
 - La compatibilité multiplateforme repose sur la bibliothèque standard Python et doit également être vérifiée dans la CI native de chaque système avant une distribution publique.
 - Les réglages et formats natifs de Codex et Claude Code peuvent évoluer ; validez une mise à jour de CLI avant de la généraliser.
 
+## Licence
+
+ForgeOS est distribué sous licence MIT. Consultez [LICENSE](LICENSE).
+
 ## Contribution
 
 1. Préservez `AGENTS.md`, `.codex/agents/` et `.agents/skills/` comme sources de vérité.

@@ -4,7 +4,7 @@ Toutes les modifications notables de ForgeOS sont consignées dans ce fichier.
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le
 projet utilise [Semantic Versioning](https://semver.org/lang/fr/).
 
-## 0.1.0 - Non publiée
+## 0.1.0 - 2026-11-14
 
 ### Ajouté
 
@@ -23,6 +23,7 @@ projet utilise [Semantic Versioning](https://semver.org/lang/fr/).
   détection de dérive et désinstallation limitée aux fichiers ForgeOS.
 - Validateurs structurels, contrôle de synchronisation Claude Code et tests
   isolés du cycle de vie de l'installateur.
+- Distribution du projet sous licence MIT.
 
 ### Limitations connues
 
@@ -33,7 +34,6 @@ projet utilise [Semantic Versioning](https://semver.org/lang/fr/).
   et le modèle restent non vérifiés en raison d'une authentification expirée.
 - ForgeOS ne configure pas l'authentification, les protections GitHub, les
   permissions distantes ni les environnements de production.
-- Aucune licence de distribution n'est actuellement déclarée dans le dépôt.
 - Les profils technologiques sont des recommandations et ne prouvent jamais la
   stack ou les versions d'un projet cible.
 - Les réglages Codex et Claude Code susceptibles de modifier les permissions
