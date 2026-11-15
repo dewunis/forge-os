@@ -414,7 +414,7 @@ def validate():
     required = {'laravel-api','nextjs-web','expo-mobile','full-product'}
     available = {p.stem for p in (ROOT / 'profiles').glob('*.yaml')}
     assert required <= available, f'Missing stack profiles: {required - available}'
-    assert 'react-native-reusables' in (ROOT / 'profiles/expo-mobile.yaml').read_text()
+    assert 'react-native-reusables' in (ROOT / 'profiles/expo-mobile.yaml').read_text(encoding='utf-8')
     assert (ROOT / 'docs/permissions.md').exists()
     installer = ROOT / 'scripts/forgeos.py'
     installer_tests = ROOT / 'tests/test_installer.py'
@@ -460,6 +460,9 @@ def validate():
             'tests.test_installer',
         )
     ), 'GitHub Actions CI workflow must enforce least privilege and run all ForgeOS validation checks across Linux, macOS, and Windows'
+    gitattributes = ROOT / '.gitattributes'
+    assert gitattributes.is_file(), '.gitattributes must exist to enforce LF line endings across OSes'
+    assert '* text=auto eol=lf' in gitattributes.read_text(encoding='utf-8'), '.gitattributes must enforce LF line endings with "* text=auto eol=lf"'
     state = json.loads((ROOT / '.ai/state.json').read_text(encoding='utf-8'))
     assert state['writer'] == 'cto', 'CTO must be the sole operational-state writer'
     activity_lines = [line for line in (ROOT / '.ai/activity.jsonl').read_text(encoding='utf-8').splitlines() if line]

@@ -108,6 +108,7 @@ class InstallerTests(unittest.TestCase):
             with self.subTest(tool=tool), tempfile.TemporaryDirectory() as temporary:
                 home = Path(temporary) / "home"
                 home.mkdir()
+                home = home.resolve()
                 common = ("--tool", tool, "--scope", "global", "--home", str(home))
                 self.assertEqual(0, self.run_cli("install", *common)[0])
                 self.assert_counts(home, tool)
