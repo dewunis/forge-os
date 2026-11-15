@@ -735,6 +735,7 @@ const engine = new PolicyEngine({
 const checks = {};
 for (const [label, name, args] of [
   ["read_env", "read_file", { file_path: ".env" }],
+  ["read_env_brace", "read_file", { file_path: ".env{,.local}" }],
   ["read_env_prod", "read_file", { file_path: "sub/.env.production" }],
   ["write_env", "write_file", { file_path: ".env", content: "SECRET=1" }],
   ["replace_env_local", "replace", { file_path: ".env.local", old_string: "a", new_string: "b" }],
@@ -745,10 +746,24 @@ for (const [label, name, args] of [
   ["many_env", "read_many_files", { include: [".env"] }],
   ["many_env_glob", "read_many_files", { include: [".env*"] }],
   ["many_env_deep_glob", "read_many_files", { include: ["**/.env*"] }],
+  ["many_env_bracket_before", "read_many_files", { include: ["[a-z].txt", ".env"] }],
+  ["many_env_deep_bracket_before", "read_many_files", { include: ["src/[a-z]*.ts", ".env*"] }],
+  ["many_env_brace", "read_many_files", { include: [".env{,.local}"] }],
   ["many_mixed_glob", "read_many_files", { include: [".env.example", ".env*"] }],
   ["many_exclude_env", "read_many_files", { include: ["src/**"], exclude: [".env"] }],
   ["many_example", "read_many_files", { include: [".env.example"] }],
   ["many_mixed", "read_many_files", { include: [".env.example", ".env"] }],
+  ["grep_env_dir", "grep_search", { pattern: "SECRET", dir_path: ".env" }],
+  ["grep_env_glob", "grep_search", { pattern: "SECRET", include_pattern: "**/.env*" }],
+  ["grep_env_example", "grep_search", { pattern: "SECRET", dir_path: ".env.example" }],
+  ["glob_env", "glob", { pattern: "**/.env*" }],
+  ["glob_env_example", "glob", { pattern: ".env.example" }],
+  ["shell_cat_env", "run_shell_command", { command: "cat .env" }],
+  ["shell_chain_env", "run_shell_command", { command: "echo ok && cat sub/.env.local" }],
+  ["shell_subshell_env", "run_shell_command", { command: 'bash -c "head -n 5 .env"' }],
+  ["shell_grep_env", "run_shell_command", { command: "grep SECRET .env*" }],
+  ["shell_source_env", "run_shell_command", { command: ". .env" }],
+  ["shell_cat_env_example", "run_shell_command", { command: "cat .env.example" }],
   ["shell_git_push", "run_shell_command", { command: "git push origin main" }],
   ["shell_terraform_apply", "run_shell_command", { command: "terraform apply" }],
   ["shell_docker_push", "run_shell_command", { command: "docker push org/app:latest" }],
@@ -817,14 +832,26 @@ console.log(
             checks = result["checks"]
             for denied_key in (
                 "read_env",
+                "read_env_brace",
                 "read_env_prod",
                 "write_env",
                 "replace_env_local",
                 "many_env",
                 "many_env_glob",
                 "many_env_deep_glob",
+                "many_env_bracket_before",
+                "many_env_deep_bracket_before",
+                "many_env_brace",
                 "many_mixed_glob",
                 "many_mixed",
+                "grep_env_dir",
+                "grep_env_glob",
+                "glob_env",
+                "shell_cat_env",
+                "shell_chain_env",
+                "shell_subshell_env",
+                "shell_grep_env",
+                "shell_source_env",
             ):
                 self.assertEqual("deny", checks[denied_key], f"Expected deny for {denied_key}")
             self.assertEqual("ask_user", checks["many_exclude_env"])
@@ -834,6 +861,9 @@ console.log(
                 "read_env_template",
                 "read_envrc",
                 "many_example",
+                "grep_env_example",
+                "glob_env_example",
+                "shell_cat_env_example",
             ):
                 self.assertEqual("allow", checks[allowed_key], f"Expected allow for {allowed_key}")
 
@@ -841,6 +871,158 @@ console.log(
             for ask_key in ("shell_git_push", "shell_terraform_apply", "shell_docker_push"):
                 self.assertEqual("ask_user", checks[ask_key], f"Expected ask_user for {ask_key}")
             self.assertEqual("allow", checks["shell_git_status"])
+
+    @unittest.skipUnless(
+        shutil.which("gemini") is not None,
+        "gemini CLI binary unavailable",
+    )
+    def test_gemini_cli_binary_enforces_policies_end_to_end(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary).resolve()
+            home = base / "home"
+            home.mkdir()
+            workspace = base / "workspace"
+            workspace.mkdir()
+            (workspace / ".env").write_text("SECRET=topsecret\n", encoding="utf-8")
+            (workspace / ".env.example").write_text("SECRET=placeholder\n", encoding="utf-8")
+
+            output = io.StringIO()
+            with redirect_stdout(output), redirect_stderr(output):
+                self.assertEqual(
+                    0,
+                    INSTALLER.main(
+                        [
+                            "install",
+                            "--tool",
+                            "gemini",
+                            "--scope",
+                            "global",
+                            "--home",
+                            str(home),
+                            "--include-settings",
+                        ]
+                    ),
+                )
+                self.assertEqual(
+                    0,
+                    INSTALLER.main(
+                        [
+                            "install",
+                            "--tool",
+                            "gemini",
+                            "--scope",
+                            "local",
+                            "--target",
+                            str(workspace),
+                            "--include-settings",
+                        ]
+                    ),
+                )
+
+            (home / ".gemini" / "trustedFolders.json").write_text(
+                json.dumps({str(workspace): "TRUST_FOLDER"}),
+                encoding="utf-8",
+            )
+            fake_file = base / "fake_responses.jsonl"
+            turns = [
+                {
+                    "method": "generateContentStream",
+                    "response": [
+                        {
+                            "candidates": [
+                                {
+                                    "content": {
+                                        "role": "model",
+                                        "parts": [
+                                            {"functionCall": {"id": "c_example", "name": "read_file", "args": {"file_path": ".env.example"}}},
+                                            {"functionCall": {"id": "c_grep", "name": "grep_search", "args": {"pattern": "SECRET", "include_pattern": "**/.env*"}}},
+                                            {"functionCall": {"id": "c_glob", "name": "glob", "args": {"pattern": "**/.env*"}}},
+                                            {"functionCall": {"id": "c_shell_env", "name": "run_shell_command", "args": {"command": "cat .env"}}},
+                                            {"functionCall": {"id": "c_git_push", "name": "run_shell_command", "args": {"command": "git push origin main"}}},
+                                        ],
+                                    },
+                                    "finishReason": "STOP",
+                                }
+                            ]
+                        }
+                    ],
+                },
+                {
+                    "method": "generateContentStream",
+                    "response": [
+                        {
+                            "candidates": [
+                                {
+                                    "content": {
+                                        "role": "model",
+                                        "parts": [{"text": "DONE_TURN"}],
+                                    },
+                                    "finishReason": "STOP",
+                                }
+                            ]
+                        }
+                    ],
+                },
+            ]
+            fake_file.write_text(
+                "\n".join(json.dumps(turn) for turn in turns) + "\n",
+                encoding="utf-8",
+            )
+            env = {
+                **os.environ,
+                "HOME": str(home),
+                "USERPROFILE": str(home),
+                "GEMINI_CLI_HOME": str(home),
+                "GEMINI_API_KEY": "fake-api-key",
+            }
+            for mode in ("default", "yolo"):
+                args = [
+                    "gemini",
+                    "-m",
+                    "gemini-2.5-pro",
+                    "-p",
+                    "Exercise ForgeOS policies end-to-end",
+                    "--fake-responses",
+                    str(fake_file),
+                    "--output-format",
+                    "stream-json",
+                ]
+                if mode == "yolo":
+                    args.insert(3, "--yolo")
+                proc = subprocess.run(
+                    args,
+                    cwd=workspace,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=30,
+                )
+                results = {}
+                for line in proc.stdout.splitlines():
+                    if not line.startswith("{"):
+                        continue
+                    event = json.loads(line)
+                    if event.get("type") == "tool_result":
+                        results[event["tool_id"]] = event
+                self.assertEqual("success", results["read_file__c_example"]["status"])
+                for denied_id in (
+                    "grep_search__c_grep",
+                    "glob__c_glob",
+                    "run_shell_command__c_shell_env",
+                ):
+                    self.assertEqual("error", results[denied_id]["status"], f"{mode}: {denied_id}")
+                    self.assertEqual(
+                        "policy_violation",
+                        results[denied_id]["error"]["type"],
+                        f"{mode}: {denied_id}",
+                    )
+                if mode == "default":
+                    self.assertEqual("error", results["run_shell_command__c_git_push"]["status"])
+                    self.assertEqual(
+                        "policy_violation",
+                        results["run_shell_command__c_git_push"]["error"]["type"],
+                    )
 
     def test_broken_symlinks_are_detected_and_removed(self) -> None:
         for label, adapter in (("claude", CLAUDE_ADAPTER), ("gemini", GEMINI_ADAPTER)):

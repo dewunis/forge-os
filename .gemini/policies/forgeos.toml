@@ -22,17 +22,38 @@ decision = "ask_user"
 priority = 200
 modes = ["default", "autoEdit"]
 
-# 2. Deny reading or writing actual .env and .env.* secret files.
+# 2. Deny reading, searching, or writing actual .env and .env.* secret files.
 [[rule]]
 toolName = ["read_file", "write_file", "replace"]
-argsPattern = '"file_path":"([^"]*[/\\]|)\.env(\.(?!example"|sample"|template")[^"]+|[*?\[][^"]*|)"'
+argsPattern = '"file_path":"([^"]*[/\\]|)\.env(\.(?!example"|sample"|template")[^"]+|[*?\[\x7b][^"]*|)"'
 decision = "deny"
 priority = 300
 denyMessage = "Access to .env secret files is denied by ForgeOS policy."
 
 [[rule]]
 toolName = "read_many_files"
-argsPattern = '"include":\[[^\]]*"([^"]*[/\\]|)\.env(\.(?!example"|sample"|template")[^"]+|[*?\[][^"]*|)"'
+argsPattern = '"include":\[[^\x00]*"([^"]*[/\\]|)\.env(\.(?!example"|sample"|template")[^"]+|[*?\[\x7b][^"]*|)"'
+decision = "deny"
+priority = 300
+denyMessage = "Access to .env secret files is denied by ForgeOS policy."
+
+[[rule]]
+toolName = "grep_search"
+argsPattern = '"(dir_path|include_pattern)":"([^"]*[/\\]|)\.env(\.(?!example"|sample"|template")[^"]+|[*?\[\x7b][^"]*|)"'
+decision = "deny"
+priority = 300
+denyMessage = "Access to .env secret files is denied by ForgeOS policy."
+
+[[rule]]
+toolName = "glob"
+argsPattern = '"(pattern|dir_path)":"([^"]*[/\\]|)\.env(\.(?!example"|sample"|template")[^"]+|[*?\[\x7b][^"]*|)"'
+decision = "deny"
+priority = 300
+denyMessage = "Access to .env secret files is denied by ForgeOS policy."
+
+[[rule]]
+toolName = "run_shell_command"
+argsPattern = '"command":"([^"]*[/\\\s"\x27=]|)\.env(\.(?!example\b|sample\b|template\b)[^"\s\x27;|&><)]+|[*?\[\x7b][^"\s\x27;|&><)]*|)(?=["\s\x27;|&><)])'
 decision = "deny"
 priority = 300
 denyMessage = "Access to .env secret files is denied by ForgeOS policy."

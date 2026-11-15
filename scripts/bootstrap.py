@@ -113,8 +113,16 @@ def validate_gemini_settings_and_policies(adapter_root: Path) -> None:
             ext in pattern for ext in ('example', 'sample', 'template')
         ):
             allowed_template_read_tools.update(tool_list)
-    assert {'read_file', 'write_file', 'replace', 'read_many_files'} <= denied_tools, (
-        'Gemini CLI policy must deny .env secret file reads and writes'
+    assert {
+        'read_file',
+        'write_file',
+        'replace',
+        'read_many_files',
+        'grep_search',
+        'glob',
+        'run_shell_command',
+    } <= denied_tools, (
+        'Gemini CLI policy must deny .env secret file reads, searches, shell access, and writes'
     )
     assert {'read_file', 'read_many_files'} <= allowed_template_read_tools, (
         'Gemini CLI policy must allow reading public .env template files'
