@@ -22,6 +22,7 @@ def _load_script_module(module_name: str, path: Path):
 
 
 INSTALLER = _load_script_module("forgeos_installer", ROOT / "scripts" / "forgeos.py")
+CLAUDE_ADAPTER = _load_script_module("claude_adapter", ROOT / "scripts" / "claude_adapter.py")
 GEMINI_ADAPTER = _load_script_module("gemini_adapter", ROOT / "scripts" / "gemini_adapter.py")
 
 
@@ -358,35 +359,37 @@ class GeminiAdapterTests(unittest.TestCase):
             GEMINI_ADAPTER.is_read_only_agent("unknown-agent")
 
     def test_broken_symlinks_are_detected_and_removed(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary) / "tree"
-            nested = root / "empty"
-            nested.mkdir(parents=True)
-            valid_file = root / "valid.md"
-            valid_file.write_bytes(b"ok\n")
-            broken_link = nested / "broken.md"
-            broken_link.symlink_to(Path(temporary) / "does-not-exist")
+        for label, adapter in (("claude", CLAUDE_ADAPTER), ("gemini", GEMINI_ADAPTER)):
+            with self.subTest(adapter=label), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary) / "tree"
+                nested = root / "empty"
+                nested.mkdir(parents=True)
+                valid_file = root / "valid.md"
+                valid_file.write_bytes(b"ok\n")
+                broken_link = nested / "broken.md"
+                broken_link.symlink_to(Path(temporary) / "does-not-exist")
 
-            problems = GEMINI_ADAPTER.check_tree({valid_file: b"ok\n"}, root, "agent")
-            self.assertEqual(1, len(problems))
-            self.assertIn("unexpected symlink agent", problems[0])
+                problems = adapter.check_tree({valid_file: b"ok\n"}, root, "agent")
+                self.assertEqual(1, len(problems))
+                self.assertIn("unexpected symlink agent", problems[0])
 
-            GEMINI_ADAPTER.remove_unexpected(root, {valid_file})
-            self.assertFalse(broken_link.is_symlink())
-            self.assertFalse(nested.exists())
-            self.assertEqual(b"ok\n", valid_file.read_bytes())
+                adapter.remove_unexpected(root, {valid_file})
+                self.assertFalse(broken_link.is_symlink())
+                self.assertFalse(nested.exists())
+                self.assertEqual(b"ok\n", valid_file.read_bytes())
 
     def test_atomic_write_replaces_broken_symlink_and_leaves_no_temp_files(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            target = root / "target.md"
-            target.symlink_to(root / "missing-target")
+        for label, adapter in (("claude", CLAUDE_ADAPTER), ("gemini", GEMINI_ADAPTER)):
+            with self.subTest(adapter=label), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                target = root / "target.md"
+                target.symlink_to(root / "missing-target")
 
-            GEMINI_ADAPTER.atomic_write(target, b"updated content\n")
-            self.assertFalse(target.is_symlink())
-            self.assertTrue(target.is_file())
-            self.assertEqual(b"updated content\n", target.read_bytes())
-            self.assertEqual([target], list(root.iterdir()))
+                adapter.atomic_write(target, b"updated content\n")
+                self.assertFalse(target.is_symlink())
+                self.assertTrue(target.is_file())
+                self.assertEqual(b"updated content\n", target.read_bytes())
+                self.assertEqual([target], list(root.iterdir()))
 
 
 if __name__ == "__main__":

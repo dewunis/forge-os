@@ -7,9 +7,9 @@
     "status": "ready_for_github_actions"
   },
   "last_completed_mission": {
-    "id": "025",
-    "title": "Switch default documentation to English with French companions",
+    "id": "026",
+    "title": "Add multi-OS GitHub Actions CI workflow and harden Claude adapter",
     "status": "completed"
   },
-  "updated_at": "2026-11-15T12:06:00Z"
+  "updated_at": "2026-11-15T12:12:00Z"
 }

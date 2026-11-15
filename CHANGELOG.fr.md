@@ -28,6 +28,11 @@ projet utilise [Semantic Versioning](https://semver.org/lang/fr/).
   (`README.md` / `README.fr.md`, `docs/installation.md` / `docs/installation.fr.md`,
   `docs/release-process.md` / `docs/release-process.fr.md`, `CHANGELOG.md` / `CHANGELOG.fr.md`)
   et contrôle des liens croisés dans `scripts/bootstrap.py`.
+- Workflow CI GitHub Actions multi-OS (`.github/workflows/ci.yml`) exécutant tous les
+  contrôles ForgeOS sur Linux, macOS et Windows à moindre privilège (`contents: read`,
+  `persist-credentials: false`), avec vérification dans `scripts/bootstrap.py`.
+- Durcissement de `scripts/claude_adapter.py` avec écritures atomiques et détection/nettoyage
+  des liens symboliques cassés, couvert aux côtés de `scripts/gemini_adapter.py` dans les tests unitaires.
 
 ## 0.1.0 - 2026-11-14
 

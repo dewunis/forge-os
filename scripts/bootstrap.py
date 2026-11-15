@@ -442,6 +442,24 @@ def validate():
         assert fr_path.is_file(), f'{fr_rel} must exist'
         assert en_link in en_path.read_text(encoding='utf-8'), f'{en_rel} must link to {en_link}'
         assert fr_link in fr_path.read_text(encoding='utf-8'), f'{fr_rel} must link to {fr_link}'
+    ci_workflow = ROOT / '.github' / 'workflows' / 'ci.yml'
+    assert ci_workflow.is_file(), 'GitHub Actions CI workflow .github/workflows/ci.yml must exist'
+    ci_text = ci_workflow.read_text(encoding='utf-8')
+    assert all(
+        term in ci_text
+        for term in (
+            'permissions:\n  contents: read',
+            'persist-credentials: false',
+            'ubuntu-latest',
+            'macos-latest',
+            'windows-latest',
+            'scripts/claude_adapter.py --check',
+            'scripts/gemini_adapter.py --check',
+            'scripts/bootstrap.py',
+            'tests/bootstrap.py',
+            'tests.test_installer',
+        )
+    ), 'GitHub Actions CI workflow must enforce least privilege and run all ForgeOS validation checks across Linux, macOS, and Windows'
     state = json.loads((ROOT / '.ai/state.json').read_text(encoding='utf-8'))
     assert state['writer'] == 'cto', 'CTO must be the sole operational-state writer'
     activity_lines = [line for line in (ROOT / '.ai/activity.jsonl').read_text(encoding='utf-8').splitlines() if line]

@@ -28,6 +28,11 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   (`README.md` / `README.fr.md`, `docs/installation.md` / `docs/installation.fr.md`,
   `docs/release-process.md` / `docs/release-process.fr.md`, `CHANGELOG.md` / `CHANGELOG.fr.md`)
   and cross-link validation in `scripts/bootstrap.py`.
+- Multi-OS GitHub Actions CI workflow (`.github/workflows/ci.yml`) running all ForgeOS
+  checks on Linux, macOS, and Windows with least-privilege permissions (`contents: read`,
+  `persist-credentials: false`), plus validation in `scripts/bootstrap.py`.
+- Hardening of `scripts/claude_adapter.py` with atomic writes and broken-symlink
+  detection and cleanup, covered alongside `scripts/gemini_adapter.py` in unit tests.
 
 ## 0.1.0 - 2026-11-14
 
