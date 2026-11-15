@@ -4,7 +4,7 @@ description: "Engineering delivery coordinator that turns approved requirements 
 subagent: true
 mainAgent: false
 tools:
-  - read_file
+  - view_file
   - run_command
   - manage_task
   - search_web

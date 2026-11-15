@@ -29,7 +29,7 @@ Common options:
 Write options:
 
 - `--conflict fail|backup` for `install` and `update`; default `fail`.
-- `--include-settings`: explicit consent to install `.codex/config.toml`, `.claude/settings.json`, and/or `.gemini/settings.json`.
+- `--include-settings`: explicit consent to install `.codex/config.toml`, `.claude/settings.json`, and/or `.gemini/settings.json` (plus `.gemini/policies/`).
 
 Scope and tool selection used for `update`, `status`, and `uninstall` must match the installation manifest.
 
@@ -97,7 +97,7 @@ Global Claude and Gemini entrypoints (as well as `~/.gemini/config/GEMINI.md`) i
 
 ## Optional settings
 
-By default, the installer does not copy `.codex/config.toml`, `.claude/settings.json`, or `.gemini/settings.json`. This avoids implicitly altering a user's sandboxing, approvals, reasoning level, or permissions.
+By default, the installer does not copy `.codex/config.toml`, `.claude/settings.json`, or `.gemini/settings.json` (and `.gemini/policies/`). This avoids implicitly altering a user's sandboxing, approvals, reasoning level, or permissions.
 
 To include them after inspection:
 

@@ -7,17 +7,118 @@ import tomllib
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def _expected_ask_rules():
-    sensitive_commands = {
+def _sensitive_commands():
+    return {
         'git push', 'git merge', 'git tag', 'gh release', 'docker push',
         'npm publish', 'eas update', 'eas submit', 'terraform apply',
         'terraform destroy', 'kubectl apply', 'kubectl delete',
     }
+
+
+def _expected_ask_rules():
     return {
         f'{tool}({command} *)'
         for tool in ('Bash', 'PowerShell')
-        for command in sensitive_commands
+        for command in _sensitive_commands()
     }
+
+
+def _extract_frontmatter_tools(frontmatter: str) -> list[str]:
+    lines = frontmatter.splitlines()
+    tools: list[str] = []
+    in_tools = False
+    for line in lines:
+        if line.strip() == 'tools:':
+            in_tools = True
+            continue
+        if in_tools:
+            if line.startswith('  - '):
+                tools.append(line[4:].strip())
+            elif line and not line.startswith(' '):
+                break
+    return tools
+
+
+def _validate_claude_settings(settings_path: Path, expected_schema: str) -> None:
+    settings = json.loads(settings_path.read_text(encoding='utf-8'))
+    assert settings['$schema'] == expected_schema
+    assert settings['permissions']['defaultMode'] == 'default'
+    assert 'model' not in settings, 'Claude Code settings must not override a model'
+    assert set(settings['permissions']['ask']) == _expected_ask_rules(), (
+        'Claude Code sensitive-command gates are incomplete'
+    )
+    assert settings['permissions']['deny'] == [
+        'Read(.env)',
+        'Read(.env.*)',
+        'Read(!.env.example)',
+        'Read(!.env.sample)',
+        'Read(!.env.template)',
+    ], 'Claude Code must deny environment secrets while preserving public templates'
+
+
+def validate_gemini_settings_and_policies(adapter_root: Path) -> None:
+    settings = json.loads((adapter_root / 'settings.json').read_text(encoding='utf-8'))
+    assert settings.get('$schema') == (
+        'https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json'
+    ), 'Gemini CLI settings must declare the official Gemini CLI schema'
+    assert 'model' not in settings, 'Gemini CLI settings must not override a model'
+    assert 'permissions' not in settings and 'contextFileName' not in settings, (
+        'Gemini CLI settings must use native Gemini CLI keys, not Claude Code permissions keys'
+    )
+    assert settings.get('context', {}).get('fileName') == [
+        'AGENTS.md',
+        'GEMINI.md',
+        '.gemini/GEMINI.md',
+    ], 'Gemini CLI settings must load canonical AGENTS.md and GEMINI.md via context.fileName'
+    assert settings.get('general', {}).get('defaultApprovalMode') == 'default', (
+        'Gemini CLI settings must keep general.defaultApprovalMode set to default'
+    )
+    assert settings.get('policyPaths') == ['.gemini/policies', '~/.gemini/policies'], (
+        'Gemini CLI settings must configure policyPaths for ForgeOS TOML policies'
+    )
+
+    policy_file = adapter_root / 'policies' / 'forgeos.toml'
+    assert policy_file.is_file(), 'Gemini CLI policy file .gemini/policies/forgeos.toml must exist'
+    rules = tomllib.loads(policy_file.read_text(encoding='utf-8')).get('rule', [])
+    assert isinstance(rules, list) and rules, 'Gemini CLI policy file must define [[rule]] entries'
+
+    ask_rules = [
+        rule for rule in rules
+        if rule.get('toolName') == 'run_shell_command' and rule.get('decision') == 'ask_user'
+    ]
+    assert ask_rules, 'Gemini CLI policy must include a run_shell_command ask_user rule'
+    configured_prefixes = {
+        prefix
+        for rule in ask_rules
+        for prefix in (
+            rule.get('commandPrefix')
+            if isinstance(rule.get('commandPrefix'), list)
+            else [rule.get('commandPrefix')]
+        )
+        if prefix
+    }
+    assert configured_prefixes == _sensitive_commands(), (
+        'Gemini CLI sensitive-command confirmation rules are incomplete'
+    )
+
+    denied_tools: set[str] = set()
+    allowed_template_read_tools: set[str] = set()
+    for rule in rules:
+        tools = rule.get('toolName')
+        tool_list = tools if isinstance(tools, list) else ([tools] if tools else [])
+        pattern = rule.get('argsPattern', '')
+        if rule.get('decision') == 'deny' and '.env' in pattern:
+            denied_tools.update(tool_list)
+        if rule.get('decision') == 'allow' and all(
+            ext in pattern for ext in ('example', 'sample', 'template')
+        ):
+            allowed_template_read_tools.update(tool_list)
+    assert {'read_file', 'write_file', 'replace', 'read_many_files'} <= denied_tools, (
+        'Gemini CLI policy must deny .env secret file reads and writes'
+    )
+    assert {'read_file', 'read_many_files'} <= allowed_template_read_tools, (
+        'Gemini CLI policy must allow reading public .env template files'
+    )
 
 
 def _validate_markdown_adapter(
@@ -28,33 +129,11 @@ def _validate_markdown_adapter(
     entry_file: str,
     adapter_script: str,
     label: str,
-    expected_schema: str | None = None,
-    expected_context_files: list[str] | None = None,
 ):
     adapter_root = ROOT / adapter_dir
     instructions = (adapter_root / entry_file).read_text(encoding='utf-8')
     assert '@../AGENTS.md' in instructions, f'{label} must import canonical AGENTS.md governance'
     assert f'{adapter_script} --check' in instructions, f'{label} adapter sync check must be documented'
-
-    settings = json.loads((adapter_root / 'settings.json').read_text(encoding='utf-8'))
-    if expected_schema is not None:
-        assert settings['$schema'] == expected_schema
-    if expected_context_files is not None:
-        assert settings.get('contextFileName') == expected_context_files, (
-            f'{label} settings must load canonical AGENTS.md and {entry_file}'
-        )
-    assert settings['permissions']['defaultMode'] == 'default'
-    assert 'model' not in settings, f'{label} settings must not override a model'
-    assert set(settings['permissions']['ask']) == _expected_ask_rules(), (
-        f'{label} sensitive-command gates are incomplete'
-    )
-    assert settings['permissions']['deny'] == [
-        'Read(.env)',
-        'Read(.env.*)',
-        'Read(!.env.example)',
-        'Read(!.env.sample)',
-        'Read(!.env.template)',
-    ], f'{label} must deny environment secrets while preserving public templates'
 
     adapter_agent_files = sorted((adapter_root / 'agents').glob('*.md'))
     assert {path.stem for path in adapter_agent_files} == {path.stem for path in agent_files}, (
@@ -89,6 +168,10 @@ def _validate_markdown_adapter(
 
 
 def validate_claude_adapter(agent_files, skill_directories):
+    _validate_claude_settings(
+        ROOT / '.claude' / 'settings.json',
+        'https://json.schemastore.org/claude-code-settings.json',
+    )
     _validate_markdown_adapter(
         agent_files,
         skill_directories,
@@ -96,11 +179,11 @@ def validate_claude_adapter(agent_files, skill_directories):
         entry_file='CLAUDE.md',
         adapter_script='scripts/claude_adapter.py',
         label='Claude Code',
-        expected_schema='https://json.schemastore.org/claude-code-settings.json',
     )
 
 
 def validate_gemini_adapter(agent_files, skill_directories):
+    validate_gemini_settings_and_policies(ROOT / '.gemini')
     _validate_markdown_adapter(
         agent_files,
         skill_directories,
@@ -108,7 +191,6 @@ def validate_gemini_adapter(agent_files, skill_directories):
         entry_file='GEMINI.md',
         adapter_script='scripts/gemini_adapter.py',
         label='Gemini CLI',
-        expected_context_files=['AGENTS.md', 'GEMINI.md'],
     )
     agents_manifest = json.loads((ROOT / '.agents' / 'agents.json').read_text(encoding='utf-8'))
     assert agents_manifest == {'entries': [{'path': '.gemini/antigravity-agents'}]}, (
@@ -126,6 +208,15 @@ def validate_gemini_adapter(agent_files, skill_directories):
         'tech-lead',
         'ui-ux-designer',
     }
+    expected_ag_read_only_tools = ['view_file', 'run_command', 'manage_task', 'search_web']
+    expected_ag_read_write_tools = [
+        'view_file',
+        'replace_file_content',
+        'write_to_file',
+        'run_command',
+        'manage_task',
+        'search_web',
+    ]
     for source in agent_files:
         config = tomllib.loads(source.read_text(encoding='utf-8'))
         cli_generated = (ROOT / '.gemini' / 'agents' / f'{source.stem}.md').read_text(encoding='utf-8')
@@ -152,9 +243,16 @@ def validate_gemini_adapter(agent_files, skill_directories):
         assert '\nsubagent: true\n' in ag_frontmatter, f'Antigravity agent {source.stem} must set subagent: true'
         assert '\nmainAgent: false\n' in ag_frontmatter, f'Antigravity agent {source.stem} must set mainAgent: false'
         assert '\ntools:\n' in ag_frontmatter, f'Antigravity agent {source.stem} must declare tools'
+        ag_tools = _extract_frontmatter_tools(ag_frontmatter)
         if source.stem in read_only_agents:
-            assert 'edit_file' not in ag_frontmatter and 'write_file' not in ag_frontmatter, (
-                f'Read-only Antigravity agent {source.stem} must not grant write tools'
+            assert ag_tools == expected_ag_read_only_tools, (
+                f'Read-only Antigravity agent {source.stem} must declare exact native tools '
+                f'{expected_ag_read_only_tools}, got {ag_tools}'
+            )
+        else:
+            assert ag_tools == expected_ag_read_write_tools, (
+                f'Implementation Antigravity agent {source.stem} must declare exact native tools '
+                f'{expected_ag_read_write_tools}, got {ag_tools}'
             )
 
 def validate():

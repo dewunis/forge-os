@@ -189,6 +189,14 @@ def _render_adapter_entry(
             f"- {settings_label} settings are in `{adapter_dir}/settings.json` only when "
             "the installer was run with `--include-settings`."
         ),
+        (
+            "Gemini CLI Policy Engine rules for command confirmations and `.env` "
+            "protection live in `.gemini/policies/forgeos.toml`;"
+        ): (
+            "Gemini CLI Policy Engine rules for command confirmations and `.env` "
+            "protection live in `.gemini/policies/forgeos.toml` (also installed only "
+            "with `--include-settings`);"
+        ),
     }
     if scope == "global":
         replacements["@../AGENTS.md"] = "@../.forgeos/AGENTS.md"
@@ -403,6 +411,12 @@ def build_plan(args: argparse.Namespace, base: Path, shared: Path) -> dict[Path,
             tools=tools,
         )
         gemini_root = base / ".gemini"
+        if args.include_settings:
+            add_tree(
+                plan,
+                SOURCE_ROOT / ".gemini" / "policies",
+                gemini_root / "policies",
+            )
         _add_rendered_agents_dir(
             plan,
             source_dir=SOURCE_ROOT / ".gemini" / "antigravity-agents",

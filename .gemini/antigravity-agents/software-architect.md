@@ -4,7 +4,7 @@ description: "Architecture specialist for evidence-based system design, boundari
 subagent: true
 mainAgent: false
 tools:
-  - read_file
+  - view_file
   - run_command
   - manage_task
   - search_web

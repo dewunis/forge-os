@@ -6,9 +6,9 @@ mainAgent: false
 skills:
   - ../skills/incident-response
 tools:
-  - read_file
-  - edit_file
-  - write_file
+  - view_file
+  - replace_file_content
+  - write_to_file
   - run_command
   - manage_task
   - search_web

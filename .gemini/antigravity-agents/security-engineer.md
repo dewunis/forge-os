@@ -6,7 +6,7 @@ mainAgent: false
 skills:
   - ../skills/security-audit
 tools:
-  - read_file
+  - view_file
   - run_command
   - manage_task
   - search_web

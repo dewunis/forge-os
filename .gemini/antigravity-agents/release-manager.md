@@ -8,9 +8,9 @@ skills:
   - ../skills/release-management
   - ../skills/semantic-versioning
 tools:
-  - read_file
-  - edit_file
-  - write_file
+  - view_file
+  - replace_file_content
+  - write_to_file
   - run_command
   - manage_task
   - search_web

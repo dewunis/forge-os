@@ -29,7 +29,7 @@ Options communes :
 Options d’écriture :
 
 - `--conflict fail|backup` pour `install` et `update` ; défaut `fail`.
-- `--include-settings` : consentement explicite à l’installation de `.codex/config.toml`, `.claude/settings.json` et/ou `.gemini/settings.json`.
+- `--include-settings` : consentement explicite à l’installation de `.codex/config.toml`, `.claude/settings.json` et/ou `.gemini/settings.json` (ainsi que `.gemini/policies/`).
 
 La portée et la sélection d’outil utilisées par `update`, `status` et `uninstall` doivent correspondre au manifeste de l’installation.
 
@@ -97,7 +97,7 @@ Les wrappers Claude et Gemini globaux (ainsi que `~/.gemini/config/GEMINI.md`) i
 
 ## Réglages optionnels
 
-Par défaut, l’installateur ne copie ni `.codex/config.toml`, ni `.claude/settings.json`, ni `.gemini/settings.json`. Il évite ainsi de modifier implicitement le sandbox, les approbations, le niveau de raisonnement ou les permissions d’un utilisateur.
+Par défaut, l’installateur ne copie ni `.codex/config.toml`, ni `.claude/settings.json`, ni `.gemini/settings.json` (ni `.gemini/policies/`). Il évite ainsi de modifier implicitement le sandbox, les approbations, le niveau de raisonnement ou les permissions d’un utilisateur.
 
 Pour les inclure après inspection :
 

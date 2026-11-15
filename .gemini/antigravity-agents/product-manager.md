@@ -4,7 +4,7 @@ description: "Product Manager and Business Analyst for clarifying business needs
 subagent: true
 mainAgent: false
 tools:
-  - read_file
+  - view_file
   - run_command
   - manage_task
   - search_web

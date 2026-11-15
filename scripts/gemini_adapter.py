@@ -74,15 +74,15 @@ GEMINI_CLI_READ_WRITE_TOOLS = (
     "activate_skill",
 )
 ANTIGRAVITY_READ_ONLY_TOOLS = (
-    "read_file",
+    "view_file",
     "run_command",
     "manage_task",
     "search_web",
 )
 ANTIGRAVITY_READ_WRITE_TOOLS = (
-    "read_file",
-    "edit_file",
-    "write_file",
+    "view_file",
+    "replace_file_content",
+    "write_to_file",
     "run_command",
     "manage_task",
     "search_web",
@@ -266,15 +266,102 @@ def atomic_write(path: Path, content: bytes) -> None:
             temporary.unlink()
 
 
+def _check_no_symlinks_to_boundary(path: Path, boundary: Path) -> None:
+    """Verify path and every ancestor up to boundary are not symlinks."""
+    if ".." in path.parts:
+        raise ValueError(f"Unsafe path traversal component in target: {path}")
+    current = path
+    while True:
+        if current.is_symlink():
+            raise ValueError(f"Refusing to synchronize through symlink: {current}")
+        if current == boundary:
+            break
+        if current == current.parent:
+            raise ValueError(f"Path {path} escapes boundary {boundary}")
+        current = current.parent
+
+
+def validate_write_plan(
+    root_targets: tuple[tuple[Path, dict[Path, bytes]], ...],
+    *,
+    single_targets: tuple[Path, ...] = (),
+    boundary: Path = ROOT,
+) -> None:
+    """Validate all generated roots, manifest files, and targets before any mutation."""
+    if boundary.is_symlink():
+        raise ValueError(f"Refusing to synchronize through symlinked root: {boundary}")
+    resolved_boundary = boundary.resolve(strict=False)
+    for destination_root, targets in root_targets:
+        _check_no_symlinks_to_boundary(destination_root, boundary)
+        resolved_root = destination_root.resolve(strict=False)
+        if resolved_root != resolved_boundary and not resolved_root.is_relative_to(
+            resolved_boundary
+        ):
+            raise ValueError(
+                f"Generated root escapes boundary {boundary}: {destination_root}"
+            )
+        if destination_root.exists():
+            if not destination_root.is_dir():
+                raise ValueError(
+                    f"Generated root exists and is not a directory: {destination_root}"
+                )
+            for existing in destination_root.rglob("*"):
+                if existing.is_symlink() and existing.is_dir():
+                    raise ValueError(
+                        f"Refusing to synchronize through symlinked directory: {existing}"
+                    )
+        for path in targets:
+            _check_no_symlinks_to_boundary(path, destination_root)
+            resolved_path = path.resolve(strict=False)
+            if not resolved_path.is_relative_to(resolved_root) or resolved_path == resolved_root:
+                raise ValueError(
+                    f"Resolved target {resolved_path} escapes root {resolved_root}"
+                )
+            if path.exists() and path.is_dir():
+                raise ValueError(f"Target file path exists and is a directory: {path}")
+            if path.parent.exists() and not path.parent.is_dir():
+                raise ValueError(f"Target parent exists and is not a directory: {path.parent}")
+    for manifest_path in single_targets:
+        _check_no_symlinks_to_boundary(manifest_path, boundary)
+        resolved_manifest = manifest_path.resolve(strict=False)
+        resolved_parent = manifest_path.parent.resolve(strict=False)
+        if resolved_parent != resolved_boundary and not resolved_parent.is_relative_to(
+            resolved_boundary
+        ):
+            raise ValueError(
+                f"Target parent escapes boundary {boundary}: {manifest_path}"
+            )
+        if resolved_parent not in resolved_manifest.parents:
+            raise ValueError(
+                f"Resolved target {resolved_manifest} escapes parent {resolved_parent}"
+            )
+        if manifest_path.exists() and manifest_path.is_dir():
+            raise ValueError(f"Target file path exists and is a directory: {manifest_path}")
+        if manifest_path.parent.exists() and not manifest_path.parent.is_dir():
+            raise ValueError(
+                f"Target parent exists and is not a directory: {manifest_path.parent}"
+            )
+
+
 def synchronize() -> None:
     gemini_agents = expected_agents()
     antigravity_agents = expected_antigravity_agents()
     skills = expected_skills()
+    manifest_bytes = expected_agents_manifest()
+    validate_write_plan(
+        (
+            (GEMINI_AGENTS, gemini_agents),
+            (ANTIGRAVITY_AGENTS, antigravity_agents),
+            (GEMINI_SKILLS, skills),
+        ),
+        single_targets=(AGENTS_MANIFEST,),
+        boundary=ROOT,
+    )
     files_to_write = {
         **gemini_agents,
         **antigravity_agents,
         **skills,
-        AGENTS_MANIFEST: expected_agents_manifest(),
+        AGENTS_MANIFEST: manifest_bytes,
     }
     for path, content in files_to_write.items():
         if path.is_symlink() or not path.exists() or path.read_bytes() != content:
