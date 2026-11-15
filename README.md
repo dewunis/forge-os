@@ -1,112 +1,114 @@
 # ForgeOS
 
-ForgeOS est une organisation d’ingénierie logicielle multi-agents utilisable avec OpenAI Codex, Claude Code, Google Antigravity (`agy` CLI & Antigravity IDE) et Gemini CLI. Elle fournit une gouvernance CTO commune, 17 spécialistes, 16 procédures réutilisables, des profils technologiques et un installateur Python sûr pour Windows, macOS et Linux.
+**English** | [Français](README.fr.md)
 
-ForgeOS n’est ni un système d’exploitation ni un framework applicatif. Il organise le travail des agents autour du code et des conventions déjà présents dans un projet.
+ForgeOS is a multi-agent software engineering organization usable with OpenAI Codex, Claude Code, Google Antigravity (`agy` CLI & Antigravity IDE), and Gemini CLI. It provides shared CTO governance, 17 specialists, 16 reusable procedures, technology profiles, and a safe Python installer for Windows, macOS, and Linux.
 
-## Principes
+ForgeOS is neither an operating system nor an application framework. It structures agent work around the code and conventions already present in a project.
 
-- Le code, les tests, les manifestes et les configurations réelles priment sur les profils ForgeOS.
-- Le CTO mobilise uniquement les spécialistes nécessaires et conserve l’arbitrage technique.
-- Les opérations sensibles, de production et de publication restent soumises à autorisation humaine.
-- Les changements importants exigent une revue indépendante.
-- Les technologies, dépendances et modèles ne sont jamais installés ou remplacés implicitement.
+## Principles
+
+- Existing code, tests, manifests, and configurations take precedence over ForgeOS profiles.
+- The CTO invokes only the specialists needed for the active request and retains technical arbitration.
+- Sensitive, production, and release operations remain gated on human authorization.
+- Significant changes require independent review.
+- Technologies, dependencies, and models are never installed or replaced implicitly.
 
 ## Architecture
 
-`AGENTS.md` est la gouvernance commune. Les rôles canoniques se trouvent dans `.codex/agents/` et les Skills canoniques dans `.agents/skills/`. Les adaptateurs Claude Code, Antigravity et Gemini CLI génèrent leurs agents et leurs miroirs de Skills sous `.claude/` et `.gemini/` (`.gemini/agents/` pour Gemini CLI, `.gemini/antigravity-agents/` via `.agents/agents.json` en local et `~/.gemini/config/` en global pour Antigravity).
+`AGENTS.md` defines the shared governance. Canonical roles live under `.codex/agents/` and canonical Skills live under `.agents/skills/`. The Claude Code, Antigravity, and Gemini CLI adapters generate their native agents and Skill mirrors under `.claude/` and `.gemini/` (`.gemini/agents/` for Gemini CLI, `.gemini/antigravity-agents/` discovered via `.agents/agents.json` locally and `~/.gemini/config/` globally for Antigravity).
 
 ```text
-Utilisateur
-  └─ CTO ForgeOS
-      ├─ cadrage : Product Manager, Software Architect, UI/UX Designer
-      ├─ livraison : Tech Lead et ingénieurs spécialisés
-      ├─ assurance : QA, Security, Performance, Code Reviewer
-      └─ documentation et release : Technical Writer, Release Manager
+User
+  └─ ForgeOS CTO
+      ├─ scoping: Product Manager, Software Architect, UI/UX Designer
+      ├─ delivery: Tech Lead and specialized engineers
+      ├─ assurance: QA, Security, Performance, Code Reviewer
+      └─ documentation and release: Technical Writer, Release Manager
 
-Sources ForgeOS
+ForgeOS sources
   ├─ AGENTS.md
   ├─ .codex/agents/*.toml
   └─ .agents/skills/*/SKILL.md
-        ├─ adaptateur généré : .claude/agents + .claude/skills
-        └─ adaptateur généré : .gemini/agents + .gemini/antigravity-agents + .gemini/skills (+ .agents/agents.json)
+        ├─ generated adapter: .claude/agents + .claude/skills
+        └─ generated adapter: .gemini/agents + .gemini/antigravity-agents + .gemini/skills (+ .agents/agents.json)
 ```
 
-Les profils de `profiles/` sont un catalogue de technologies, jamais une preuve des versions installées dans un projet.
+Profiles in `profiles/` are a technology catalog only, never evidence of versions installed in a target project.
 
 ## Agents
 
-ForgeOS comprend 17 sous-agents :
+ForgeOS includes 17 subagents:
 
-| Domaine | Agents |
+| Domain | Agents |
 | --- | --- |
-| Produit et architecture | Product Manager + Business Analyst, Software Architect, Tech Lead |
-| Développement | Frontend Engineer, Backend Engineer, Mobile Engineer, Database Engineer, AI/LLM Engineer |
-| Expérience | UI/UX Designer |
-| Plateforme et exploitation | Platform / DevOps Engineer, Reliability Engineer |
-| Qualité et sécurité | QA Engineer, Security Engineer, Performance Engineer, Code Reviewer |
-| Documentation et livraison | Technical Writer & API Documentation Engineer, Release Manager |
+| Product & architecture | Product Manager + Business Analyst, Software Architect, Tech Lead |
+| Engineering | Frontend Engineer, Backend Engineer, Mobile Engineer, Database Engineer, AI/LLM Engineer |
+| Experience | UI/UX Designer |
+| Platform & operations | Platform / DevOps Engineer, Reliability Engineer |
+| Quality & security | QA Engineer, Security Engineer, Performance Engineer, Code Reviewer |
+| Documentation & delivery | Technical Writer & API Documentation Engineer, Release Manager |
 
-Le CTO est l’orchestrateur racine et n’est pas compté parmi ces 17 sous-agents.
+The CTO is the root orchestrator and is not counted among these 17 subagents.
 
 ## Skills
 
-Les 16 Skills couvrent : développement frontend, backend, mobile et IA ; migrations de données ; UI/UX ; CI/CD ; réponse aux incidents ; audits de performance et de sécurité ; documentation API ; tests ; revue de code ; gestion de release ; versionnement sémantique ; génération de changelog.
+The 16 Skills cover: frontend, backend, mobile, and AI development; database migrations; UI/UX; CI/CD; incident response; performance and security audits; API documentation; software testing; code review; release management; semantic versioning; changelog generation.
 
-Chaque Skill utilise un manifeste obligatoire `SKILL.md`. Les copies sous `.claude/skills/` et `.gemini/skills/` sont générées pour la découverte Claude Code, Antigravity et Gemini CLI et ne doivent pas être modifiées directement.
+Each Skill uses a mandatory `SKILL.md` manifest. Copies under `.claude/skills/` and `.gemini/skills/` are generated mirrors for Claude Code, Antigravity, and Gemini CLI discovery and must not be edited directly.
 
-## Technologies couvertes
+## Covered technologies
 
-- Backend : Laravel/PHP, NestJS/TypeScript, FastAPI/Python.
-- Web : Next.js, React, TypeScript, Tailwind CSS, shadcn/ui, Nuxt et Vue.
-- Mobile : Expo, React Native, Expo Router, React Native Reusables, NativeWind et Uniwind.
-- Données : PostgreSQL, MySQL/MariaDB, Redis et SQLite mobile lorsque justifié.
-- Plateforme : Docker, GitHub Actions, Linux, Nginx, Caddy et Terraform dans un périmètre autorisé.
-- Qualité : Pest/PHPUnit, Vitest, Jest, Playwright, Maestro, Lighthouse, k6 et outils natifs du projet.
+- Backend: Laravel/PHP, NestJS/TypeScript, FastAPI/Python.
+- Web: Next.js, React, TypeScript, Tailwind CSS, shadcn/ui, Nuxt, and Vue.
+- Mobile: Expo, React Native, Expo Router, React Native Reusables, NativeWind, and Uniwind.
+- Data: PostgreSQL, MySQL/MariaDB, Redis, and mobile SQLite where justified.
+- Platform: Docker, GitHub Actions, Linux, Nginx, Caddy, and scoped Terraform.
+- Quality: Pest/PHPUnit, Vitest, Jest, Playwright, Maestro, Lighthouse, k6, and native project tooling.
 
-ForgeOS n’installe aucune de ces technologies. Il détecte et respecte les versions réellement présentes.
+ForgeOS installs none of these technologies. It detects and respects the versions actually present.
 
-## Prérequis
+## Prerequisites
 
-- Python 3.9 ou version ultérieure pour l’installateur, sans dépendance externe.
-- Codex, Claude Code, Google Antigravity (`agy` CLI / Antigravity IDE) et/ou Gemini CLI installés et authentifiés séparément.
-- Python 3.11 ou version ultérieure pour le validateur source `scripts/bootstrap.py`, qui utilise `tomllib`.
+- Python 3.9 or later for the installer, with zero external dependencies.
+- Codex, Claude Code, Google Antigravity (`agy` CLI / Antigravity IDE), and/or Gemini CLI installed and authenticated separately.
+- Python 3.11 or later for the source validator `scripts/bootstrap.py`, which uses `tomllib`.
 
 ## Installation
 
-Installation locale dans un projet :
+Local installation into a project:
 
 ```shell
-python scripts/forgeos.py install --tool all --scope local --target /chemin/du/projet
+python scripts/forgeos.py install --tool all --scope local --target /path/to/project
 ```
 
-Installation globale pour l’utilisateur courant :
+Global installation for the current user:
 
 ```shell
 python scripts/forgeos.py install --tool all --scope global
 ```
 
-Valeurs disponibles pour `--tool` : `codex`, `claude`, `gemini` (cible Antigravity `agy` CLI / Antigravity IDE et Gemini CLI) ou `all`. La portée `local` utilise le projet ciblé (dont `.agents/agents.json` et, si `gemini` est installé seul, `.agents/skills.json`) ; la portée `global` utilise le répertoire personnel retourné par Python et les dossiers natifs `.codex`, `.agents/skills`, `.claude`, `.gemini` et `.gemini/config`.
+Available `--tool` values: `codex`, `claude`, `gemini` (targets Antigravity `agy` CLI / Antigravity IDE and Gemini CLI), or `all`. The `local` scope writes to the target project (including `.agents/agents.json` and, when `gemini` is installed standalone, `.agents/skills.json`); the `global` scope uses the home directory resolved by Python and native folders `.codex`, `.agents/skills`, `.claude`, `.gemini`, and `.gemini/config`.
 
-Les fichiers de réglages qui influencent le sandbox, les approbations ou les permissions ne sont pas installés par défaut. Leur installation exige un consentement explicite :
-
-```shell
-python scripts/forgeos.py install --tool all --scope local --target /chemin/du/projet --include-settings
-```
-
-Si un fichier existe déjà, l’installation s’arrête sans mutation. Pour demander explicitement sa sauvegarde avant remplacement :
+Settings files that affect sandboxing, approvals, or permissions are not installed by default. Installing them requires explicit consent:
 
 ```shell
-python scripts/forgeos.py install --tool all --scope local --target /chemin/du/projet --conflict backup
+python scripts/forgeos.py install --tool all --scope local --target /path/to/project --include-settings
 ```
 
-Consultez [docs/installation.md](docs/installation.md) pour les chemins, les sauvegardes, les codes de résultat et les exemples Windows, macOS et Linux.
+If a target file already exists, installation stops without mutating anything. To explicitly request backups before replacement:
 
-Le workflow Git, les gates de validation et la procédure de publication sont
-décrits dans [docs/release-process.md](docs/release-process.md). Les changements
-livrables sont récapitulés dans [CHANGELOG.md](CHANGELOG.md).
+```shell
+python scripts/forgeos.py install --tool all --scope local --target /path/to/project --conflict backup
+```
 
-## Utilisation et maintenance
+See [docs/installation.md](docs/installation.md) for destination paths, backups, exit codes, and Windows, macOS, and Linux examples.
+
+The Git workflow, validation gates, and release procedure are described in
+[docs/release-process.md](docs/release-process.md). Deliverable changes are
+summarized in [CHANGELOG.md](CHANGELOG.md).
+
+## Usage and maintenance
 
 ```shell
 python scripts/forgeos.py status --tool all --scope global
@@ -114,11 +116,11 @@ python scripts/forgeos.py update --tool all --scope global
 python scripts/forgeos.py uninstall --tool all --scope global
 ```
 
-Pour une installation locale, ajoutez `--target /chemin/du/projet`. La sélection d’outil et la portée doivent correspondre au manifeste créé lors de l’installation.
+For a local installation, add `--target /path/to/project`. Tool selection and scope must match the manifest created at install time.
 
-L’installateur maintient un manifeste `.forgeos/install-manifest.json` avec les empreintes des fichiers qu’il possède. Une modification utilisateur est signalée comme dérive et n’est ni écrasée ni supprimée sans choix explicite. La désinstallation ne touche pas les fichiers extérieurs au manifeste et restaure les sauvegardes préexistantes lorsqu’elle peut le faire sans perte.
+The installer maintains `.forgeos/install-manifest.json` with hashes of owned files. Any user modification is flagged as drift and is neither overwritten nor deleted without explicit choice. Uninstallation leaves files outside the manifest untouched and restores pre-existing backups when it can do so without data loss.
 
-## Validation du dépôt source
+## Repository validation
 
 ```shell
 python scripts/claude_adapter.py --check
@@ -128,38 +130,38 @@ python tests/bootstrap.py
 python -m unittest tests.test_installer -v
 ```
 
-Les tests de l’installateur utilisent uniquement des répertoires temporaires. Ils ne modifient pas la configuration globale réelle.
+Installer tests run strictly in temporary directories. They never modify real global configuration.
 
-## Sécurité
+## Security
 
-- Aucun secret, token ou fichier d’environnement réel ne doit être copié dans ForgeOS.
-- Les instructions d’agents sont une gouvernance, pas une frontière de sécurité.
-- Les permissions effectives dépendent du sandbox, des identités, des règles Git, de la CI et des environnements protégés.
-- Aucun push, merge, tag, déploiement ou changement de production n’est autorisé implicitement.
-- L’option `--include-settings` et le mode de conflit `backup` sont des consentements explicites à des mutations supplémentaires ; inspectez toujours leur portée avant exécution.
+- Never copy secrets, tokens, or real `.env` files into ForgeOS.
+- Agent instructions are governance, not a security boundary.
+- Effective permissions depend on host sandboxing, identities, Git rules, CI, and protected environments.
+- No push, merge, tag, deployment, or production mutation is implicitly authorized.
+- `--include-settings` and `--conflict backup` are explicit consents to additional mutations; always inspect scope before running them.
 
 ## Limitations
 
-- L’installateur ne configure ni l’authentification Codex/Claude/Gemini ni les permissions distantes.
-- Les profils technologiques sont indicatifs et n’installent aucune dépendance.
-- Une gouvernance utilisateur existante peut entrer en conflit avec ForgeOS ; le comportement par défaut est alors l’arrêt sans écriture.
-- Les instantanés de récupération créés pendant une mise à jour sont conservés après désinstallation lorsqu’ils peuvent contenir des modifications utilisateur ; le CLI signale leur emplacement pour nettoyage manuel.
-- La compatibilité multiplateforme repose sur la bibliothèque standard Python et doit également être vérifiée dans la CI native de chaque système avant une distribution publique.
-- Les réglages et formats natifs de Codex, Claude Code, Antigravity et Gemini CLI peuvent évoluer ; validez une mise à jour de CLI avant de la généraliser.
+- The installer does not configure Codex/Claude/Gemini authentication or remote permissions.
+- Technology profiles are guidance catalogs only and install no dependencies.
+- Existing user governance can conflict with ForgeOS; the default behavior is to abort without writing.
+- Recovery snapshots created during an update are retained after uninstall when they may hold user edits; the CLI prints their location for manual cleanup.
+- Cross-platform behavior relies on the Python standard library and should also be verified in each target OS's native CI before public release.
+- Native settings and formats for Codex, Claude Code, Antigravity, and Gemini CLI can evolve; validate CLI upgrades before rolling them out broadly.
 
-## Licence
+## License
 
-ForgeOS est distribué sous licence MIT. Consultez [LICENSE](LICENSE).
+ForgeOS is distributed under the MIT License. See [LICENSE](LICENSE).
 
-## Contribution
+## Contributing
 
-1. Préservez `AGENTS.md`, `.codex/agents/` et `.agents/skills/` comme sources de vérité.
-2. Régénérez les adaptateurs Claude et Gemini avec `python scripts/claude_adapter.py` et `python scripts/gemini_adapter.py`.
-3. N’éditez pas manuellement les fichiers générés sous `.claude/agents/`, `.claude/skills/`, `.gemini/agents/`, `.gemini/antigravity-agents/` ou `.gemini/skills/`.
-4. Ajoutez ou adaptez les tests isolés pour toute évolution de l’installateur.
-5. Exécutez toutes les validations ci-dessus et documentez uniquement les résultats réellement observés.
-6. Ne modifiez pas les conventions du code applicatif au nom des conventions internes ForgeOS.
+1. Preserve `AGENTS.md`, `.codex/agents/`, and `.agents/skills/` as sources of truth.
+2. Regenerate the Claude and Gemini/Antigravity adapters with `python scripts/claude_adapter.py` and `python scripts/gemini_adapter.py`.
+3. Do not manually edit generated files under `.claude/agents/`, `.claude/skills/`, `.gemini/agents/`, `.gemini/antigravity-agents/`, or `.gemini/skills/`.
+4. Add or update isolated tests for any installer or adapter change.
+5. Run all validation commands above and report only directly observed results.
+6. Never override application source-code conventions in the name of ForgeOS internal naming rules.
 
-Les nouveaux commits suivent Conventional Commits et transitent par `dev`. La
-promotion vers `main`, la création de tags et la publication de releases restent
-soumises aux revues et autorisations décrites dans la procédure de release.
+New commits follow Conventional Commits and land on `dev`. Promotion to `main`,
+tagging, and publishing releases remain gated by the reviews and approvals
+described in the release process.

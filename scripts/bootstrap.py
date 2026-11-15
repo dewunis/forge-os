@@ -426,7 +426,22 @@ def validate():
     assert 'tempfile' in installer_text and 'install-manifest.json' in installer_text, 'Installer must use atomic temporary writes and an ownership manifest'
     assert '.forgeos/' in (ROOT / '.gitignore').read_text(encoding='utf-8'), 'Local installer state must be ignored by Git'
     readme_text = (ROOT / 'README.md').read_text(encoding='utf-8')
-    assert all(heading in readme_text for heading in ('## Architecture', '## Agents', '## Skills', '## Installation', '## Sécurité', '## Limitations', '## Contribution')), 'README must cover the required professional sections'
+    assert all(heading in readme_text for heading in ('## Architecture', '## Agents', '## Skills', '## Installation', '## Security', '## Limitations', '## Contributing', 'README.fr.md')), 'English README must cover the required professional sections and link to README.fr.md'
+    readme_fr_path = ROOT / 'README.fr.md'
+    assert readme_fr_path.is_file(), 'French companion README.fr.md must exist'
+    readme_fr_text = readme_fr_path.read_text(encoding='utf-8')
+    assert all(heading in readme_fr_text for heading in ('## Architecture', '## Agents', '## Skills', '## Installation', '## Sécurité', '## Limitations', '## Contribution', 'README.md')), 'French README must cover the required professional sections and link to README.md'
+    for en_rel, fr_rel, en_link, fr_link in (
+        ('docs/installation.md', 'docs/installation.fr.md', 'installation.fr.md', 'installation.md'),
+        ('docs/release-process.md', 'docs/release-process.fr.md', 'release-process.fr.md', 'release-process.md'),
+        ('CHANGELOG.md', 'CHANGELOG.fr.md', 'CHANGELOG.fr.md', 'CHANGELOG.md'),
+    ):
+        en_path = ROOT / en_rel
+        fr_path = ROOT / fr_rel
+        assert en_path.is_file(), f'{en_rel} must exist'
+        assert fr_path.is_file(), f'{fr_rel} must exist'
+        assert en_link in en_path.read_text(encoding='utf-8'), f'{en_rel} must link to {en_link}'
+        assert fr_link in fr_path.read_text(encoding='utf-8'), f'{fr_rel} must link to {fr_link}'
     state = json.loads((ROOT / '.ai/state.json').read_text(encoding='utf-8'))
     assert state['writer'] == 'cto', 'CTO must be the sole operational-state writer'
     activity_lines = [line for line in (ROOT / '.ai/activity.jsonl').read_text(encoding='utf-8').splitlines() if line]

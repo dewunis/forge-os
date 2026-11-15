@@ -1,56 +1,58 @@
 # Git workflow and release process
 
+**English** | [Français](release-process.fr.md)
+
 ## Branches
 
-- `main` contient uniquement les versions stables ou les candidats validés.
-- `dev` est la branche d'intégration. Elle est créée depuis `main` et reçoit les
-  changements vérifiés avant toute proposition de promotion.
-- Une évolution isolée peut utiliser une branche courte issue de `dev`, puis
-  revenir dans `dev` par revue.
+- `main` holds only stable releases or validated candidates.
+- `dev` is the integration branch. It is created from `main` and receives
+  verified changes before any promotion proposal.
+- Isolated work may use a short-lived branch created from `dev` and merged back
+  into `dev` after review.
 
-L'historique ne doit pas être réécrit. Les force-pushes, suppressions de branche
-stable et contournements de protection sont interdits.
+History must never be rewritten. Force-pushes, deletion of stable branches, and
+protection bypasses are forbidden.
 
 ## Commits
 
-Les nouveaux commits suivent Conventional Commits : `feat`, `fix`, `docs`,
-`test`, `refactor`, `perf`, `build`, `ci`, `chore` ou `revert`, avec un scope
-facultatif. Un commit doit représenter une unité cohérente et ne doit contenir
-ni secret, ni fichier temporaire, ni résultat présenté comme vérifié sans preuve.
+New commits follow Conventional Commits: `feat`, `fix`, `docs`, `test`,
+`refactor`, `perf`, `build`, `ci`, `chore`, or `revert`, with an optional
+scope. Each commit must represent a coherent unit of work and must contain no
+secrets, temporary files, or results claimed as verified without evidence.
 
-## Préparation d'une release
+## Preparing a release
 
-1. Partir d'un `dev` propre et identifier le commit candidat.
-2. Déduire la version du comportement public réellement vérifié et mettre à
-   jour le changelog canonique.
-3. Exécuter les contrôles de synchronisation, le bootstrap, les tests
-   structurels et les tests de l'installateur.
-4. Faire examiner les changements significatifs par un reviewer indépendant.
-5. Ouvrir une pull request `dev` vers `main` et attendre les contrôles et
-   approbations requis.
-6. Après autorisation, fusionner sans réécrire l'historique et revérifier le
-   commit exact de `main`.
-7. Après autorisation distincte, créer le tag annoté `vX.Y.Z` sur ce commit,
-   pousser le tag et publier la GitHub Release depuis `main`.
+1. Start from a clean `dev` branch and identify the candidate commit.
+2. Derive the version from verified public behavior and update the canonical
+   changelog.
+3. Run the adapter sync checks, bootstrap validator, structural tests, and
+   installer test suite.
+4. Have significant changes reviewed by an independent reviewer.
+5. Open a pull request from `dev` to `main` and wait for required checks and
+   approvals.
+6. After authorization, merge without rewriting history and re-verify the exact
+   commit on `main`.
+7. After separate authorization, create the annotated tag `vX.Y.Z` on that
+   commit, push the tag, and publish the GitHub Release from `main`.
 
-Une préparation réussie n'autorise pas le merge, le tag, la publication ou le
-déploiement. Une validation critique en échec bloque la release.
+Successful preparation does not authorize merging, tagging, publishing, or
+deploying. Any failing critical check blocks the release.
 
-## Protections GitHub recommandées
+## Recommended GitHub protections
 
-Configurer une ruleset pour `main` exigeant une pull request, au moins une revue
-indépendante, la résolution des conversations et les contrôles automatisés
-requis. Interdire les force-pushes et la suppression de `main`. Protéger aussi
-les tags `v*` contre la modification et la suppression non autorisées.
+Configure a ruleset for `main` requiring a pull request, at least one
+independent review, conversation resolution, and required automated status
+checks. Disallow force-pushes and deletion of `main`. Also protect `v*` tags
+against unauthorized modification or deletion.
 
-ForgeOS documente ces contrôles mais ne les active pas implicitement : leur
-configuration GitHub requiert une autorisation et des droits de dépôt adaptés.
+ForgeOS documents these controls but does not enable them implicitly: applying
+them on GitHub requires appropriate repository permissions and explicit
+authorization.
 
-## Récupération
+## Recovery
 
-Si un tag local incorrect est détecté, ne pas le pousser : suspendre la release,
-documenter l'écart et demander une autorisation explicite avant toute correction.
-Après publication, ne jamais déplacer silencieusement un tag ; choisir avec le
-propriétaire du dépôt une correction explicite ou une nouvelle version. Les
-défauts publiés sont corrigés par un commit et une version ultérieure, sans
-réécriture de l'historique.
+If an incorrect local tag is detected, do not push it: pause the release,
+document the discrepancy, and ask for explicit authorization before fixing it.
+After publication, never silently move a tag; agree with the repository owner
+on an explicit correction or a new version. Published defects are fixed by a
+subsequent commit and version without rewriting history.
