@@ -7,9 +7,9 @@
     "status": "ready_for_github_actions"
   },
   "last_completed_mission": {
-    "id": "022",
-    "title": "Cross-platform documentation and installation",
+    "id": "024",
+    "title": "Add Gemini CLI adapter and Google Gemini API support",
     "status": "completed"
   },
-  "updated_at": "2026-11-14T23:01:51Z"
+  "updated_at": "2026-11-15T10:19:00Z"
 }

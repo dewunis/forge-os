@@ -11,10 +11,18 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parent.parent
-SPEC = importlib.util.spec_from_file_location("forgeos_installer", ROOT / "scripts" / "forgeos.py")
-assert SPEC and SPEC.loader
-INSTALLER = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(INSTALLER)
+
+
+def _load_script_module(module_name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+INSTALLER = _load_script_module("forgeos_installer", ROOT / "scripts" / "forgeos.py")
+GEMINI_ADAPTER = _load_script_module("gemini_adapter", ROOT / "scripts" / "gemini_adapter.py")
 
 
 class InstallerTests(unittest.TestCase):
@@ -33,6 +41,11 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(17, len(list((root / ".claude" / "agents").glob("*.md"))))
             self.assertEqual(16, len(list((root / ".claude" / "skills").glob("*/SKILL.md"))))
             self.assertFalse((root / ".claude" / "settings.json").exists())
+        if tool in {"gemini", "all"}:
+            self.assertEqual(17, len(list((root / ".gemini" / "agents").glob("*.md"))))
+            self.assertEqual(17, len(list((root / ".gemini" / "antigravity-agents").glob("*.md"))))
+            self.assertEqual(16, len(list((root / ".gemini" / "skills").glob("*/SKILL.md"))))
+            self.assertFalse((root / ".gemini" / "settings.json").exists())
 
     def test_local_all_lifecycle_is_isolated(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -51,8 +64,46 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual("keep", sentinel.read_text(encoding="utf-8"))
             self.assertFalse((target / ".forgeos" / "install-manifest.json").exists())
 
+    def test_local_gemini_lifecycle_is_isolated(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / "projet gemini"
+            target.mkdir()
+            common = ("--tool", "gemini", "--scope", "local", "--target", str(target))
+
+            self.assertEqual(0, self.run_cli("install", *common)[0])
+            self.assert_counts(target, "gemini")
+            self.assertTrue((target / "AGENTS.md").is_file())
+            self.assertTrue((target / ".gemini" / "GEMINI.md").is_file())
+            self.assertFalse((target / ".codex").exists())
+            self.assertFalse((target / ".claude").exists())
+            self.assertTrue((target / ".agents" / "agents.json").is_file())
+            self.assertTrue((target / ".agents" / "skills.json").is_file())
+            self.assertFalse((target / ".agents" / "skills").exists())
+            self.assertEqual(
+                {"entries": [{"path": ".gemini/antigravity-agents"}]},
+                json.loads((target / ".agents" / "agents.json").read_text(encoding="utf-8")),
+            )
+            self.assertEqual(
+                {"entries": [{"path": ".gemini/skills"}]},
+                json.loads((target / ".agents" / "skills.json").read_text(encoding="utf-8")),
+            )
+            governance = (target / "AGENTS.md").read_text(encoding="utf-8")
+            self.assertIn(".gemini/skills/*/SKILL.md", governance)
+            self.assertNotIn("gemini_adapter.py", governance)
+            gemini_entry = (target / ".gemini" / "GEMINI.md").read_text(encoding="utf-8")
+            self.assertIn("@../AGENTS.md", gemini_entry)
+            self.assertNotIn("gemini_adapter.py", gemini_entry)
+            self.assertEqual(0, self.run_cli("status", *common)[0])
+            self.assertEqual(0, self.run_cli("update", *common)[0])
+            self.assertEqual(0, self.run_cli("uninstall", *common)[0])
+            self.assertFalse((target / ".forgeos" / "install-manifest.json").exists())
+
     def test_global_tool_selections_use_only_injected_home(self) -> None:
-        for tool in ("codex", "claude", "all"):
+        isolated_adapters = {
+            "claude": ("CLAUDE.md", "claude_adapter.py", ".gemini"),
+            "gemini": ("GEMINI.md", "gemini_adapter.py", ".claude"),
+        }
+        for tool in ("codex", "claude", "gemini", "all"):
             with self.subTest(tool=tool), tempfile.TemporaryDirectory() as temporary:
                 home = Path(temporary) / "home"
                 home.mkdir()
@@ -63,20 +114,47 @@ class InstallerTests(unittest.TestCase):
                 if tool == "codex":
                     self.assertTrue((home / ".codex" / "AGENTS.md").is_file())
                     self.assertFalse((home / ".claude").exists())
-                elif tool == "claude":
-                    self.assertTrue((home / ".claude" / "CLAUDE.md").is_file())
+                    self.assertFalse((home / ".gemini").exists())
+                elif tool in isolated_adapters:
+                    entry_name, adapter_script, other_dir = isolated_adapters[tool]
+                    entry_path = home / f".{tool}" / entry_name
+                    self.assertTrue(entry_path.is_file())
                     self.assertFalse((home / ".codex").exists())
                     self.assertFalse((home / ".agents").exists())
-                    claude_entry = (home / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
-                    self.assertIn("@../.forgeos/AGENTS.md", claude_entry)
-                    self.assertNotIn(".codex/agents/*.toml", claude_entry)
-                    self.assertNotIn(".agents/skills/*/SKILL.md", claude_entry)
-                    self.assertNotIn("claude_adapter.py", claude_entry)
-                    claude_agent = (home / ".claude" / "agents" / "frontend-engineer.md").read_text(encoding="utf-8")
-                    self.assertIn((home / ".claude" / "skills").as_posix(), claude_agent)
-                    self.assertNotIn(".agents/skills/", claude_agent)
+                    self.assertFalse((home / other_dir).exists())
+                    entry = entry_path.read_text(encoding="utf-8")
+                    self.assertIn("@../.forgeos/AGENTS.md", entry)
+                    self.assertNotIn(".codex/agents/*.toml", entry)
+                    self.assertNotIn(".agents/skills/*/SKILL.md", entry)
+                    self.assertNotIn(adapter_script, entry)
+                    adapter_agent = (home / f".{tool}" / "agents" / "frontend-engineer.md").read_text(encoding="utf-8")
+                    self.assertIn((home / f".{tool}" / "skills").as_posix(), adapter_agent)
+                    self.assertNotIn(".agents/skills/", adapter_agent)
                     canonical_agent = (home / ".forgeos" / "sources" / "agents" / "frontend-engineer.toml").read_text(encoding="utf-8")
-                    self.assertIn((home / ".claude" / "skills").as_posix(), canonical_agent)
+                    self.assertIn((home / f".{tool}" / "skills").as_posix(), canonical_agent)
+                    if tool == "gemini":
+                        config_root = home / ".gemini" / "config"
+                        self.assertTrue((config_root / "GEMINI.md").is_file())
+                        self.assertTrue((config_root / "agents.json").is_file())
+                        self.assertTrue((config_root / "skills.json").is_file())
+                        self.assertIn(
+                            "@../../.forgeos/AGENTS.md",
+                            (config_root / "GEMINI.md").read_text(encoding="utf-8"),
+                        )
+                        self.assertEqual(
+                            {"entries": [{"path": (home / ".gemini" / "antigravity-agents").as_posix()}]},
+                            json.loads((config_root / "agents.json").read_text(encoding="utf-8")),
+                        )
+                        self.assertEqual(
+                            {"entries": [{"path": (home / ".gemini" / "skills").as_posix()}]},
+                            json.loads((config_root / "skills.json").read_text(encoding="utf-8")),
+                        )
+                        ag_agent = (
+                            home / ".gemini" / "antigravity-agents" / "frontend-engineer.md"
+                        ).read_text(encoding="utf-8")
+                        self.assertIn((home / ".gemini" / "skills").as_posix(), ag_agent)
+                        self.assertIn("../skills/frontend-development", ag_agent)
+                        self.assertNotIn(".agents/skills/", ag_agent)
                 self.assertEqual(0, self.run_cli("status", *common)[0])
                 self.assertEqual(0, self.run_cli("uninstall", *common)[0])
 
@@ -130,6 +208,7 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(0, self.run_cli("install", *common)[0])
             self.assertTrue((target / ".codex" / "config.toml").is_file())
             self.assertTrue((target / ".claude" / "settings.json").is_file())
+            self.assertTrue((target / ".gemini" / "settings.json").is_file())
             self.assertEqual(0, self.run_cli("uninstall", *common)[0])
 
     def test_wrong_tool_cannot_inspect_or_uninstall_an_all_installation(self) -> None:
@@ -147,6 +226,7 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(before, manifest.read_bytes())
             self.assertTrue((target / ".codex" / "agents" / "frontend-engineer.toml").is_file())
             self.assertTrue((target / ".claude" / "agents" / "frontend-engineer.md").is_file())
+            self.assertTrue((target / ".gemini" / "agents" / "frontend-engineer.md").is_file())
             self.assertEqual(0, self.run_cli("status", *all_args)[0])
             self.assertEqual(0, self.run_cli("uninstall", *all_args)[0])
 
@@ -259,6 +339,54 @@ class InstallerTests(unittest.TestCase):
             self.assertNotIn("AGENTS.md", manifest["files"])
             self.assertEqual(0, self.run_cli("uninstall", *common)[0])
             self.assertEqual("original governance\n", instructions.read_text(encoding="utf-8"))
+
+
+class GeminiAdapterTests(unittest.TestCase):
+    def test_role_classification_is_exhaustive_and_rejects_unknown_role(self) -> None:
+        canonical_stems = {path.stem for path in GEMINI_ADAPTER.canonical_agent_files()}
+        self.assertEqual(17, len(canonical_stems))
+        self.assertFalse(GEMINI_ADAPTER.READ_ONLY_AGENTS & GEMINI_ADAPTER.READ_WRITE_AGENTS)
+        self.assertEqual(
+            canonical_stems,
+            GEMINI_ADAPTER.READ_ONLY_AGENTS | GEMINI_ADAPTER.READ_WRITE_AGENTS,
+        )
+        for name in GEMINI_ADAPTER.READ_ONLY_AGENTS:
+            self.assertTrue(GEMINI_ADAPTER.is_read_only_agent(name))
+        for name in GEMINI_ADAPTER.READ_WRITE_AGENTS:
+            self.assertFalse(GEMINI_ADAPTER.is_read_only_agent(name))
+        with self.assertRaises(ValueError):
+            GEMINI_ADAPTER.is_read_only_agent("unknown-agent")
+
+    def test_broken_symlinks_are_detected_and_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "tree"
+            nested = root / "empty"
+            nested.mkdir(parents=True)
+            valid_file = root / "valid.md"
+            valid_file.write_bytes(b"ok\n")
+            broken_link = nested / "broken.md"
+            broken_link.symlink_to(Path(temporary) / "does-not-exist")
+
+            problems = GEMINI_ADAPTER.check_tree({valid_file: b"ok\n"}, root, "agent")
+            self.assertEqual(1, len(problems))
+            self.assertIn("unexpected symlink agent", problems[0])
+
+            GEMINI_ADAPTER.remove_unexpected(root, {valid_file})
+            self.assertFalse(broken_link.is_symlink())
+            self.assertFalse(nested.exists())
+            self.assertEqual(b"ok\n", valid_file.read_bytes())
+
+    def test_atomic_write_replaces_broken_symlink_and_leaves_no_temp_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = root / "target.md"
+            target.symlink_to(root / "missing-target")
+
+            GEMINI_ADAPTER.atomic_write(target, b"updated content\n")
+            self.assertFalse(target.is_symlink())
+            self.assertTrue(target.is_file())
+            self.assertEqual(b"updated content\n", target.read_bytes())
+            self.assertEqual([target], list(root.iterdir()))
 
 
 if __name__ == "__main__":

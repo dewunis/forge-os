@@ -7,5 +7,5 @@ rules:
 stack:
   backend: fastapi
   language: python
-  ai: openai-sdk-when-needed
+  ai: openai-or-google-genai-sdk-when-needed
   testing: pytest

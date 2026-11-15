@@ -10,6 +10,7 @@ Use lowercase names and kebab-case for compound names when the relevant tool sup
 
 - AI configuration under `.codex/`;
 - Claude Code configuration under `.claude/`;
+- Gemini CLI configuration under `.gemini/`;
 - agent definition files;
 - Skills under `.agents/skills/`;
 - technology profiles under `profiles/`;
@@ -17,7 +18,7 @@ Use lowercase names and kebab-case for compound names when the relevant tool sup
 - installer ownership state under `.forgeos/`;
 - ForgeOS-specific documentation.
 
-Tool-required names take precedence over this preference. Use the exact canonical names `AGENTS.md` and `SKILL.md` for shared project instructions and Skill manifests, and `CLAUDE.md` plus `settings.json` for the Claude Code adapter. Claude subagent filenames use lowercase kebab-case with the `.md` extension.
+Tool-required names take precedence over this preference. Use the exact canonical names `AGENTS.md` and `SKILL.md` for shared project instructions and Skill manifests, `CLAUDE.md` plus `settings.json` for the Claude Code adapter, and `GEMINI.md` plus `settings.json` for the Gemini CLI adapter. Claude and Gemini subagent filenames use lowercase kebab-case with the `.md` extension.
 
 ## Software project files
 

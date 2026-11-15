@@ -1,0 +1,42 @@
+{
+  "contextFileName": [
+    "AGENTS.md",
+    "GEMINI.md"
+  ],
+  "permissions": {
+    "defaultMode": "default",
+    "ask": [
+      "Bash(git push *)",
+      "Bash(git merge *)",
+      "Bash(git tag *)",
+      "Bash(gh release *)",
+      "Bash(docker push *)",
+      "Bash(npm publish *)",
+      "Bash(eas update *)",
+      "Bash(eas submit *)",
+      "Bash(terraform apply *)",
+      "Bash(terraform destroy *)",
+      "Bash(kubectl apply *)",
+      "Bash(kubectl delete *)",
+      "PowerShell(git push *)",
+      "PowerShell(git merge *)",
+      "PowerShell(git tag *)",
+      "PowerShell(gh release *)",
+      "PowerShell(docker push *)",
+      "PowerShell(npm publish *)",
+      "PowerShell(eas update *)",
+      "PowerShell(eas submit *)",
+      "PowerShell(terraform apply *)",
+      "PowerShell(terraform destroy *)",
+      "PowerShell(kubectl apply *)",
+      "PowerShell(kubectl delete *)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(!.env.example)",
+      "Read(!.env.sample)",
+      "Read(!.env.template)"
+    ]
+  }
+}

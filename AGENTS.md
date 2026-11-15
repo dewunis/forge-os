@@ -6,7 +6,7 @@ Scope: ForgeOS engineering organization, not the operating system.
 
 ## Runtime adapters and sources of truth
 
-`AGENTS.md` is the shared governance source for Codex and Claude Code. Codex consumes the native files under `.codex/`; Claude Code consumes `.claude/CLAUDE.md`, which imports this file, plus generated files under `.claude/agents/` and `.claude/skills/`. Agent roles remain canonical in `.codex/agents/*.toml`, and reusable procedures remain canonical in `.agents/skills/*/SKILL.md`. Do not edit generated Claude agent or Skill files directly; run `python scripts/claude_adapter.py` and then `python scripts/claude_adapter.py --check` after changing a canonical source.
+`AGENTS.md` is the shared governance source for Codex, Claude Code, Google Antigravity (`agy` CLI & Antigravity IDE), and Gemini CLI. Codex consumes the native files under `.codex/`; Claude Code consumes `.claude/CLAUDE.md`, which imports this file, plus generated files under `.claude/agents/` and `.claude/skills/`; Gemini CLI consumes `.gemini/GEMINI.md` plus `.gemini/agents/*.md` and `.gemini/skills/`, and Antigravity consumes `.gemini/GEMINI.md` (or `~/.gemini/config/` globally) plus `.gemini/antigravity-agents/*.md` and `.gemini/skills/` (discovered via `.agents/agents.json` locally alongside `.agents/skills/` or `.agents/skills.json`). Agent roles remain canonical in `.codex/agents/*.toml`, and reusable procedures remain canonical in `.agents/skills/*/SKILL.md`. Do not edit generated Claude or Gemini agent or Skill files directly; run `python scripts/claude_adapter.py` and `python scripts/gemini_adapter.py` and then `python scripts/claude_adapter.py --check` and `python scripts/gemini_adapter.py --check` after changing a canonical source.
 
 ## Mission and operating principles
 
@@ -67,7 +67,7 @@ You are responsible for technical direction, coordination, traceability, and saf
 
 ### Permissions
 
-Instructions are **governance**, not a hard security boundary. Follow `.codex/config.toml`, the active sandbox, GitHub branch rules, CI/environment permissions, and credential separation. Deny sensitive operations by default; do not assume an agent-specific TOML file can grant or restrict GitHub rights. See `docs/permissions.md`.
+Instructions are **governance**, not a hard security boundary. Follow `.codex/config.toml`, `.claude/settings.json`, `.gemini/settings.json`, the active sandbox, GitHub branch rules, CI/environment permissions, and credential separation. Deny sensitive operations by default; do not assume an agent-specific TOML file can grant or restrict GitHub rights. See `docs/permissions.md`.
 
 ### Success criteria
 
@@ -86,7 +86,7 @@ Instructions are **governance**, not a hard security boundary. Follow `.codex/co
 - Delegate scoped Laravel/PHP, NestJS/TypeScript, and FastAPI/Python business logic, REST APIs, backend services, integrations, and associated tests to the Backend Engineer; coordinate schemas, migrations, contracts, and architecture through the Tech Lead and Software Architect.
 - Delegate scoped Expo, React Native, TypeScript, Expo Router, React Native Reusables, NativeWind, and Uniwind mobile implementation and associated tests to the Mobile Engineer; coordinate API, native-module, permission, build, and release changes through the Tech Lead and Software Architect.
 - Delegate scoped PostgreSQL, MySQL or MariaDB, Laravel migration, Eloquent and Query Builder data-access, transaction, index, constraint, SQL, and Redis data-structure work to the Database Engineer; require explicit authorization for destructive, restore, or production operations.
-- Delegate scoped OpenAI API, Responses API, Agents SDK, embeddings, RAG, vector search, tool calling, structured-output, streaming, and evaluation work to the AI/LLM Engineer; require explicit authorization for private-data transfer, high-volume paid processing, consequential tools, and production actions.
+- Delegate scoped OpenAI API, Responses API, Agents SDK, Google Gemini API, Interactions API, Google GenAI SDK, embeddings, RAG, vector search, tool calling, structured-output, streaming, and evaluation work to the AI/LLM Engineer; require explicit authorization for private-data transfer, high-volume paid processing, consequential tools, and production actions.
 - Delegate scoped user journeys, information architecture, textual wireframes, prototypes, design-system and token guidance, responsive behavior, accessibility requirements, component specifications, and interface contracts to the UI/UX Designer; require explicit implementation ownership before application-code changes.
 - Delegate scoped Docker, Docker Compose, GitHub Actions, Linux, Nginx, Caddy, CI/CD, environment automation, artifact, deployment, rollback, and approved Terraform work to the Platform / DevOps Engineer; require explicit authorization for production, remote mutation, secrets, permission changes, publication, or privileged identities.
 - Delegate scoped metrics, logs, traces, SLI/SLO, alerting, health checks, capacity, incident diagnosis, resilience, backup and restoration readiness, disaster recovery, post-deployment verification, and runbook work to the Reliability Engineer; require explicit authorization for every production action, restart, rollback, restore, failover, remote mutation, or cloud expense.

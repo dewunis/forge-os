@@ -21,6 +21,7 @@
 - [x] Agent 18: Release Manager (`.codex/agents/release-manager.toml`) + reusable release-management, semantic-versioning, and changelog-generation Skills.
 - [x] Claude Code adapter: shared `AGENTS.md` governance, 17 generated native subagents, mirrored Skills, project permissions, and drift validation.
 - [x] Cross-platform installer: safe local/global Codex and Claude Code lifecycle with ownership manifests, conflict backups, isolated tests, and installation documentation.
+- [x] Gemini support: generated Gemini CLI adapter (`.gemini/`), `scripts/gemini_adapter.py`, `--tool gemini` installer target, and Google Gemini API / GenAI SDK coverage in `ai-llm-engineer` and `ai-development`.
 - [ ] Full GitHub CI/CD, protected branches, permission tests and approval workflows.
 
 Agent definitions and Skills are added **only when implemented**, not as dummy files.

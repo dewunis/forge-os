@@ -3,7 +3,7 @@
 ## Prérequis
 
 - Python 3.9+ pour `scripts/forgeos.py`. L’installateur utilise uniquement la bibliothèque standard.
-- Codex et/ou Claude Code installés et authentifiés séparément selon leur documentation officielle.
+- Codex, Claude Code, Google Antigravity (`agy` CLI / Antigravity IDE) et/ou Gemini CLI installés et authentifiés séparément selon leur documentation officielle.
 - Python 3.11+ uniquement pour `scripts/bootstrap.py`, car le validateur source analyse le TOML avec `tomllib`.
 
 L’installateur ne télécharge aucune dépendance et ne modifie aucun service distant.
@@ -19,7 +19,7 @@ python scripts/forgeos.py uninstall [options]
 
 Options communes :
 
-- `--tool codex|claude|all` : adaptateur à gérer ; défaut `all`.
+- `--tool codex|claude|gemini|all` : adaptateur à gérer (`gemini` cible Google Antigravity `agy` CLI / Antigravity IDE et Gemini CLI) ; défaut `all`.
 - `--scope global|local` : installation utilisateur ou projet ; défaut `global`.
 - `--target PATH` : projet cible pour une installation locale ; défaut répertoire courant.
 - `--home PATH` : remplacement de la racine utilisateur pour une installation globale isolée ou administrée. Cette option sert notamment aux tests et ne doit pas pointer vers un profil réel par accident.
@@ -27,7 +27,7 @@ Options communes :
 Options d’écriture :
 
 - `--conflict fail|backup` pour `install` et `update` ; défaut `fail`.
-- `--include-settings` : consentement explicite à l’installation de `.codex/config.toml` et/ou `.claude/settings.json`.
+- `--include-settings` : consentement explicite à l’installation de `.codex/config.toml`, `.claude/settings.json` et/ou `.gemini/settings.json`.
 
 La portée et la sélection d’outil utilisées par `update`, `status` et `uninstall` doivent correspondre au manifeste de l’installation.
 
@@ -47,15 +47,16 @@ python3 ./scripts/forgeos.py install --tool all --scope local --target /srv/mon-
 
 Une installation locale place les fichiers dans les emplacements natifs du projet :
 
-| Composant | Codex | Claude Code |
-| --- | --- | --- |
-| Gouvernance | `AGENTS.md` | `AGENTS.md` importé par `.claude/CLAUDE.md` |
-| Agents | `.codex/agents/*.toml` | `.claude/agents/*.md` |
-| Skills | `.agents/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` |
-| Ressources | `docs/`, `profiles/`, `standards/` | `docs/`, `profiles/`, `standards/` |
-| Propriété | `.forgeos/install-manifest.json` | `.forgeos/install-manifest.json` |
+| Composant | Codex | Claude Code | Antigravity / Gemini CLI |
+| --- | --- | --- | --- |
+| Gouvernance | `AGENTS.md` | `AGENTS.md` importé par `.claude/CLAUDE.md` | `AGENTS.md` importé par `.gemini/GEMINI.md` |
+| Agents | `.codex/agents/*.toml` | `.claude/agents/*.md` | `.gemini/agents/*.md` (Gemini CLI) et `.gemini/antigravity-agents/*.md` (Antigravity) |
+| Découverte Antigravity | — | — | `.agents/agents.json` -> `.gemini/antigravity-agents` (+ `.agents/skills.json` si `gemini` seul) |
+| Skills | `.agents/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` | `.gemini/skills/*/SKILL.md` |
+| Ressources | `docs/`, `profiles/`, `standards/` | `docs/`, `profiles/`, `standards/` | `docs/`, `profiles/`, `standards/` |
+| Propriété | `.forgeos/install-manifest.json` | `.forgeos/install-manifest.json` | `.forgeos/install-manifest.json` |
 
-Une installation `claude` seule conserve ses sources ForgeOS internes sous `.forgeos/sources/` et ne crée pas `.codex/` ou `.agents/`.
+Une installation `claude` seule conserve ses sources ForgeOS internes sous `.forgeos/sources/` et ne crée pas `.codex/` ou `.agents/`. Une installation `gemini` seule crée uniquement les manifestes de découverte Antigravity `.agents/agents.json` et `.agents/skills.json` (sans `.codex/` ni `.agents/skills/`).
 
 ## Installation globale
 
@@ -81,13 +82,20 @@ Python résout le répertoire personnel de l’utilisateur sans chemin codé en 
 | Entrée Claude | `~/.claude/CLAUDE.md` |
 | Agents Claude | `~/.claude/agents/*.md` |
 | Skills Claude | `~/.claude/skills/*/SKILL.md` |
+| Entrée Gemini | `~/.gemini/GEMINI.md` |
+| Gouvernance Antigravity | `~/.gemini/config/GEMINI.md` |
+| Découverte agents Antigravity | `~/.gemini/config/agents.json` (-> `~/.gemini/antigravity-agents`) |
+| Découverte Skills Antigravity | `~/.gemini/config/skills.json` (-> `~/.gemini/skills`) |
+| Agents Gemini CLI | `~/.gemini/agents/*.md` |
+| Agents Antigravity | `~/.gemini/antigravity-agents/*.md` |
+| Skills Gemini / Antigravity | `~/.gemini/skills/*/SKILL.md` |
 | Ressources partagées et manifeste | `~/.forgeos/` |
 
-Le wrapper Claude global importe `~/.forgeos/AGENTS.md`. Les références contenues dans les agents sont rendues vers les Skills de la cible afin qu’elles ne dépendent pas du répertoire de travail courant.
+Les wrappers Claude et Gemini globaux (ainsi que `~/.gemini/config/GEMINI.md`) importent `~/.forgeos/AGENTS.md`. Les références contenues dans les agents sont rendues vers les Skills de la cible afin qu’elles ne dépendent pas du répertoire de travail courant.
 
 ## Réglages optionnels
 
-Par défaut, l’installateur ne copie ni `.codex/config.toml` ni `.claude/settings.json`. Il évite ainsi de modifier implicitement le sandbox, les approbations, le niveau de raisonnement ou les permissions d’un utilisateur.
+Par défaut, l’installateur ne copie ni `.codex/config.toml`, ni `.claude/settings.json`, ni `.gemini/settings.json`. Il évite ainsi de modifier implicitement le sandbox, les approbations, le niveau de raisonnement ou les permissions d’un utilisateur.
 
 Pour les inclure après inspection :
 
@@ -194,12 +202,13 @@ Depuis la racine du dépôt source :
 
 ```shell
 python3 scripts/claude_adapter.py --check
+python3 scripts/gemini_adapter.py --check
 python3 scripts/bootstrap.py
 python3 tests/bootstrap.py
 python3 -m unittest tests.test_installer -v
 ```
 
-Les validations structurelles ne prouvent pas l’authentification, l’accès réseau ou les permissions distantes de Codex et Claude Code.
+Les validations structurelles ne prouvent pas l’authentification, l’accès réseau ou les permissions distantes de Codex, Claude Code et Gemini CLI.
 
 ## Dépannage sûr
 
@@ -207,4 +216,4 @@ Les validations structurelles ne prouvent pas l’authentification, l’accès r
 - `existing files would be replaced` : inspectez les fichiers listés ; choisissez `backup` uniquement après avoir confirmé la collision.
 - `drift or conflicts` : comparez le fichier modifié avec la source ForgeOS avant toute sauvegarde ou mise à jour.
 - manifeste invalide : ne le recréez pas à la main ; restaurez-le depuis une sauvegarde fiable ou examinez les fichiers possédés avant une intervention manuelle.
-- erreur d’authentification Codex/Claude : utilisez les commandes officielles du CLI concerné ; ForgeOS ne gère pas les identifiants.
+- erreur d’authentification Codex/Claude/Gemini : utilisez les commandes officielles du CLI concerné ; ForgeOS ne gère pas les identifiants.

@@ -1,6 +1,6 @@
 ---
 name: ai-development
-description: Design, implement, and evaluate scoped AI integrations with validated inputs and outputs, controlled data access, measurable quality, and bounded cost. Use for OpenAI Responses API, Agents SDK, embeddings, RAG, vector search, tools, structured outputs, or streaming; do not use for unauthorized data transfer, secret exposure, or large paid runs.
+description: Design, implement, and evaluate scoped AI integrations with validated inputs and outputs, controlled data access, measurable quality, and bounded cost. Use for OpenAI Responses API, Agents SDK, Google Gemini API, Interactions API, Google GenAI SDK, embeddings, RAG, vector search, tools, structured outputs, or streaming; do not use for unauthorized data transfer, secret exposure, or large paid runs.
 ---
 
 # AI development procedure
@@ -16,14 +16,14 @@ description: Design, implement, and evaluate scoped AI integrations with validat
 
 Start with deterministic code or one model call. Add retrieval only when external knowledge or corpus grounding is required; add tools only when the model must request bounded application capabilities; add the Agents SDK or multiple agents only when real orchestration, state, specialization, or handoffs justify the added failure, latency, security, and cost surface.
 
-Prefer the Responses API for a new OpenAI integration when it fits current official guidance and project constraints. Do not rewrite a working integration merely for API novelty.
+Prefer the Responses API for a new OpenAI integration when it fits current official guidance and project constraints. For a new Google Gemini integration, prefer the Interactions API (`client.interactions.create`) with the official `google-genai` (Python) or `@google/genai` (TypeScript/JavaScript) SDK when it fits current official guidance, avoid deprecated `google-generativeai` / `@google/generative-ai` SDKs and deprecated `gemini-1.5-*` / `gemini-2.0-*` / `gemini-2.5-*` models, and use the Gemini Live API only when real-time bidirectional streaming is required. Do not rewrite a working integration merely for API novelty.
 
 Choose a model using current availability and evidence for capability, modality, structured outputs, tools, context, latency, reliability, and budget. Baseline the smallest suitable model and escalate only when evaluations justify it. Do not invent performance or cost claims.
 
 ## Define trust and data boundaries
 
 - Classify each input, retrieved document, metadata field, prompt segment, model output, tool argument, and destination as trusted or untrusted.
-- Minimize context and external data transfer. Preserve tenant isolation, authorization, provenance, deletion and retention rules, and prevent private data from entering prompts, logs, traces, caches, embeddings, or providers without approval.
+- Minimize context and external data transfer. Preserve tenant isolation, authorization, provenance, deletion and retention rules, and prevent private data from entering prompts, logs, traces, caches, embeddings, or providers without approval. Explicitly disable provider-side storage defaults (such as setting `store=False` / `store: false` on Gemini Interactions API calls) whenever tenant, privacy, or retention policy prohibits provider-side state storage.
 - Treat retrieved content and model output as untrusted data, never as higher-priority instructions. Delimit content, detect or contain prompt injection, allowlist sources and tools, and enforce permissions and side-effect approval in deterministic application code.
 - Keep provider secrets server-side. Frontend and mobile applications call an authorized backend and never receive a secret provider key.
 

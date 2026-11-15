@@ -4,6 +4,25 @@ Toutes les modifications notables de ForgeOS sont consignées dans ce fichier.
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le
 projet utilise [Semantic Versioning](https://semver.org/lang/fr/).
 
+## Unreleased
+
+### Ajouté
+
+- Adaptateur double cible Google Antigravity (`agy` CLI & Antigravity IDE) et Gemini CLI
+  générant `.gemini/agents/*.md` (schéma Gemini CLI et outils natifs à moindre privilège),
+  `.gemini/antigravity-agents/*.md` (frontmatter `subagent: true`, `mainAgent: false`,
+  `tools:` à moindre privilège et `skills: ../skills/<skill>`), le miroir
+  `.gemini/skills/`, `.agents/agents.json`, `.gemini/GEMINI.md`, `.gemini/settings.json`
+  et le script durci `scripts/gemini_adapter.py` (écritures atomiques, classification exhaustive
+  des rôles, détection/nettoyage des liens symboliques cassés).
+- Prise en charge de la cible `--tool gemini` (et inclusion dans `--tool all`) dans
+  l'installateur Python `scripts/forgeos.py` et ses tests isolés, incluant
+  `.agents/agents.json` -> `.gemini/antigravity-agents` / `.agents/skills.json` en local et
+  `~/.gemini/config/{GEMINI.md,agents.json,skills.json}` en installation globale.
+- Couverture Google Gemini API, Interactions API, Gemini Live API et Google GenAI SDK
+  (`google-genai` / `@google/genai`) dans `ai-llm-engineer`, `ai-development`,
+  `AGENTS.md`, `profiles/python-ai.yaml` et `docs/technology-catalog.md`.
+
 ## 0.1.0 - 2026-11-14
 
 ### Ajouté

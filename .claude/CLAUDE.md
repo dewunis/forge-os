@@ -4,7 +4,7 @@
 
 ## Adapter contract
 
-- `AGENTS.md` is the canonical ForgeOS governance file for Codex and Claude Code.
+- `AGENTS.md` is the canonical ForgeOS governance file for Codex, Claude Code, and Gemini CLI.
 - `.codex/agents/*.toml` is the canonical source for the 17 specialist role definitions. `.claude/agents/*.md` is generated from it.
 - `.agents/skills/*/SKILL.md` is the canonical source for reusable procedures. `.claude/skills/` is a generated Claude Code mirror.
 - Do not edit generated agent or Skill files directly. Update the canonical source, run `python scripts/claude_adapter.py`, then run `python scripts/claude_adapter.py --check`.
