@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import sys
+import tempfile
 import tomllib
 
 
@@ -67,38 +69,52 @@ def expected_agents() -> dict[Path, bytes]:
 def expected_skills() -> dict[Path, bytes]:
     expected: dict[Path, bytes] = {}
     for source_dir in canonical_skill_directories():
-        for source in sorted(path for path in source_dir.rglob("*") if path.is_file()):
-            relative = source.relative_to(SHARED_SKILLS)
-            expected[CLAUDE_SKILLS / relative] = source.read_bytes()
+        if source_dir.is_symlink():
+            raise ValueError(f"Symlink not allowed in canonical skills: {source_dir}")
+        for source in sorted(source_dir.rglob("*")):
+            if source.is_symlink():
+                raise ValueError(f"Symlink not allowed in canonical skills: {source}")
+            if source.is_file():
+                relative = source.relative_to(SHARED_SKILLS)
+                expected[CLAUDE_SKILLS / relative] = source.read_bytes()
     return expected
 
 
 def actual_files(root: Path) -> set[Path]:
-    if not root.exists():
+    if not root.exists() and not root.is_symlink():
         return set()
-    return {path for path in root.rglob("*") if path.is_file()}
+    return {path for path in root.rglob("*") if path.is_symlink() or path.is_file()}
+
+
+def _display_path(path: Path, root: Path) -> Path:
+    return path.relative_to(ROOT) if path.is_relative_to(ROOT) else path.relative_to(root)
 
 
 def check_tree(expected: dict[Path, bytes], root: Path, label: str) -> list[str]:
     problems: list[str] = []
+    if root.is_symlink():
+        return [f"unexpected symlink directory {label}: {_display_path(root, root.parent)}"]
     actual = actual_files(root)
     expected_paths = set(expected)
     for missing in sorted(expected_paths - actual):
-        problems.append(f"missing {label}: {missing.relative_to(ROOT)}")
+        problems.append(f"missing {label}: {_display_path(missing, root)}")
     for extra in sorted(actual - expected_paths):
-        problems.append(f"unexpected {label}: {extra.relative_to(ROOT)}")
+        prefix = "unexpected symlink" if extra.is_symlink() else "unexpected"
+        problems.append(f"{prefix} {label}: {_display_path(extra, root)}")
     for path in sorted(actual & expected_paths):
-        if path.read_bytes() != expected[path]:
-            problems.append(f"stale {label}: {path.relative_to(ROOT)}")
+        if path.is_symlink():
+            problems.append(f"unexpected symlink {label}: {_display_path(path, root)}")
+        elif path.read_bytes() != expected[path]:
+            problems.append(f"stale {label}: {_display_path(path, root)}")
     return problems
 
 
 def remove_unexpected(root: Path, expected_paths: set[Path]) -> None:
     for path in sorted(actual_files(root) - expected_paths, reverse=True):
         path.unlink()
-    if root.exists():
+    if root.exists() and not root.is_symlink():
         for directory in sorted(
-            (path for path in root.rglob("*") if path.is_dir()),
+            (path for path in root.rglob("*") if path.is_dir() and not path.is_symlink()),
             key=lambda path: len(path.parts),
             reverse=True,
         ):
@@ -108,13 +124,88 @@ def remove_unexpected(root: Path, expected_paths: set[Path]) -> None:
                 pass
 
 
+def atomic_write(path: Path, content: bytes) -> None:
+    """Atomically write bytes to path, replacing regular files or symlinks."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", dir=path.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(content)
+        temporary.replace(path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def _check_no_symlinks_to_boundary(path: Path, boundary: Path) -> None:
+    """Verify path and every ancestor up to boundary are not symlinks."""
+    if ".." in path.parts:
+        raise ValueError(f"Unsafe path traversal component in target: {path}")
+    current = path
+    while True:
+        if current.is_symlink():
+            raise ValueError(f"Refusing to synchronize through symlink: {current}")
+        if current == boundary:
+            break
+        if current == current.parent:
+            raise ValueError(f"Path {path} escapes boundary {boundary}")
+        current = current.parent
+
+
+def validate_write_plan(
+    root_targets: tuple[tuple[Path, dict[Path, bytes]], ...],
+    *,
+    boundary: Path = ROOT,
+) -> None:
+    """Validate all generated roots and write destinations before any mutation."""
+    if boundary.is_symlink():
+        raise ValueError(f"Refusing to synchronize through symlinked root: {boundary}")
+    resolved_boundary = boundary.resolve(strict=False)
+    for destination_root, targets in root_targets:
+        _check_no_symlinks_to_boundary(destination_root, boundary)
+        resolved_root = destination_root.resolve(strict=False)
+        if resolved_root != resolved_boundary and not resolved_root.is_relative_to(
+            resolved_boundary
+        ):
+            raise ValueError(
+                f"Generated root escapes boundary {boundary}: {destination_root}"
+            )
+        if destination_root.exists():
+            if not destination_root.is_dir():
+                raise ValueError(
+                    f"Generated root exists and is not a directory: {destination_root}"
+                )
+            for existing in destination_root.rglob("*"):
+                if existing.is_symlink() and existing.is_dir():
+                    raise ValueError(
+                        f"Refusing to synchronize through symlinked directory: {existing}"
+                    )
+        for path in targets:
+            _check_no_symlinks_to_boundary(path, destination_root)
+            resolved_path = path.resolve(strict=False)
+            if not resolved_path.is_relative_to(resolved_root) or resolved_path == resolved_root:
+                raise ValueError(
+                    f"Resolved target {resolved_path} escapes root {resolved_root}"
+                )
+            if path.exists() and path.is_dir():
+                raise ValueError(f"Target file path exists and is a directory: {path}")
+            if path.parent.exists() and not path.parent.is_dir():
+                raise ValueError(f"Target parent exists and is not a directory: {path.parent}")
+
+
 def synchronize() -> None:
     agents = expected_agents()
     skills = expected_skills()
+    validate_write_plan(
+        ((CLAUDE_AGENTS, agents), (CLAUDE_SKILLS, skills)),
+        boundary=ROOT,
+    )
     for path, content in {**agents, **skills}.items():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if not path.exists() or path.read_bytes() != content:
-            path.write_bytes(content)
+        if path.is_symlink() or not path.exists() or path.read_bytes() != content:
+            atomic_write(path, content)
     remove_unexpected(CLAUDE_AGENTS, set(agents))
     remove_unexpected(CLAUDE_SKILLS, set(skills))
     print(f"SYNCED: {len(agents)} Claude agents and {len(canonical_skill_directories())} Skills.")

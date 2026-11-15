@@ -1,14 +1,16 @@
-# Installation et maintenance
+# Installation and maintenance
 
-## Prérequis
+**English** | [Français](installation.fr.md)
 
-- Python 3.9+ pour `scripts/forgeos.py`. L’installateur utilise uniquement la bibliothèque standard.
-- Codex et/ou Claude Code installés et authentifiés séparément selon leur documentation officielle.
-- Python 3.11+ uniquement pour `scripts/bootstrap.py`, car le validateur source analyse le TOML avec `tomllib`.
+## Prerequisites
 
-L’installateur ne télécharge aucune dépendance et ne modifie aucun service distant.
+- Python 3.9+ for `scripts/forgeos.py`. The installer uses only the Python standard library.
+- Codex, Claude Code, Google Antigravity (`agy` CLI / Antigravity IDE), and/or Gemini CLI installed and authenticated separately per their official documentation.
+- Python 3.11+ only for `scripts/bootstrap.py`, because the source validator parses TOML with `tomllib`.
 
-## Commandes
+The installer downloads no dependencies and modifies no remote services.
+
+## Commands
 
 ```text
 python scripts/forgeos.py install   [options]
@@ -17,47 +19,48 @@ python scripts/forgeos.py status    [options]
 python scripts/forgeos.py uninstall [options]
 ```
 
-Options communes :
+Common options:
 
-- `--tool codex|claude|all` : adaptateur à gérer ; défaut `all`.
-- `--scope global|local` : installation utilisateur ou projet ; défaut `global`.
-- `--target PATH` : projet cible pour une installation locale ; défaut répertoire courant.
-- `--home PATH` : remplacement de la racine utilisateur pour une installation globale isolée ou administrée. Cette option sert notamment aux tests et ne doit pas pointer vers un profil réel par accident.
+- `--tool codex|claude|gemini|all`: adapter to manage (`gemini` targets Google Antigravity `agy` CLI / Antigravity IDE and Gemini CLI); default `all`.
+- `--scope global|local`: user or project installation; default `global`.
+- `--target PATH`: target project for a local installation; default current working directory.
+- `--home PATH`: user home override for an isolated or managed global installation. Intended primarily for testing; never point it at a real profile accidentally.
 
-Options d’écriture :
+Write options:
 
-- `--conflict fail|backup` pour `install` et `update` ; défaut `fail`.
-- `--include-settings` : consentement explicite à l’installation de `.codex/config.toml` et/ou `.claude/settings.json`.
+- `--conflict fail|backup` for `install` and `update`; default `fail`.
+- `--include-settings`: explicit consent to install `.codex/config.toml`, `.claude/settings.json`, and/or `.gemini/settings.json` (plus `.gemini/policies/`).
 
-La portée et la sélection d’outil utilisées par `update`, `status` et `uninstall` doivent correspondre au manifeste de l’installation.
+Scope and tool selection used for `update`, `status`, and `uninstall` must match the installation manifest.
 
-## Installation locale
+## Local installation
 
 ### Windows PowerShell
 
 ```powershell
-python .\scripts\forgeos.py install --tool all --scope local --target C:\src\mon-projet
+python .\scripts\forgeos.py install --tool all --scope local --target C:\src\my-project
 ```
 
-### macOS et Linux
+### macOS and Linux
 
 ```shell
-python3 ./scripts/forgeos.py install --tool all --scope local --target /srv/mon-projet
+python3 ./scripts/forgeos.py install --tool all --scope local --target /srv/my-project
 ```
 
-Une installation locale place les fichiers dans les emplacements natifs du projet :
+A local installation places files in the project's native locations:
 
-| Composant | Codex | Claude Code |
-| --- | --- | --- |
-| Gouvernance | `AGENTS.md` | `AGENTS.md` importé par `.claude/CLAUDE.md` |
-| Agents | `.codex/agents/*.toml` | `.claude/agents/*.md` |
-| Skills | `.agents/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` |
-| Ressources | `docs/`, `profiles/`, `standards/` | `docs/`, `profiles/`, `standards/` |
-| Propriété | `.forgeos/install-manifest.json` | `.forgeos/install-manifest.json` |
+| Component | Codex | Claude Code | Antigravity / Gemini CLI |
+| --- | --- | --- | --- |
+| Governance | `AGENTS.md` | `AGENTS.md` imported by `.claude/CLAUDE.md` | `AGENTS.md` imported by `.gemini/GEMINI.md` |
+| Agents | `.codex/agents/*.toml` | `.claude/agents/*.md` | `.gemini/agents/*.md` (Gemini CLI) and `.gemini/antigravity-agents/*.md` (Antigravity) |
+| Antigravity discovery | — | — | `.agents/agents.json` -> `.gemini/antigravity-agents` (+ `.agents/skills.json` when `gemini`-only) |
+| Skills | `.agents/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` | `.gemini/skills/*/SKILL.md` |
+| Resources | `docs/`, `profiles/`, `standards/` | `docs/`, `profiles/`, `standards/` | `docs/`, `profiles/`, `standards/` |
+| Ownership | `.forgeos/install-manifest.json` | `.forgeos/install-manifest.json` | `.forgeos/install-manifest.json` |
 
-Une installation `claude` seule conserve ses sources ForgeOS internes sous `.forgeos/sources/` et ne crée pas `.codex/` ou `.agents/`.
+A `claude`-only installation keeps its internal ForgeOS sources under `.forgeos/sources/` and does not create `.codex/` or `.agents/`. A `gemini`-only installation creates only the Antigravity discovery manifests `.agents/agents.json` and `.agents/skills.json` (without `.codex/` or `.agents/skills/`).
 
-## Installation globale
+## Global installation
 
 ### Windows PowerShell
 
@@ -65,107 +68,114 @@ Une installation `claude` seule conserve ses sources ForgeOS internes sous `.for
 python .\scripts\forgeos.py install --tool all --scope global
 ```
 
-### macOS et Linux
+### macOS and Linux
 
 ```shell
 python3 ./scripts/forgeos.py install --tool all --scope global
 ```
 
-Python résout le répertoire personnel de l’utilisateur sans chemin codé en dur. Les destinations sont identiques dans ce répertoire sur les trois plateformes :
+Python resolves the user's home directory without hardcoded paths. Destination paths inside that directory are identical across all three platforms:
 
-| Composant | Destination globale |
+| Component | Global destination |
 | --- | --- |
-| Gouvernance Codex | `~/.codex/AGENTS.md` |
-| Agents Codex | `~/.codex/agents/*.toml` |
-| Skills Codex | `~/.agents/skills/*/SKILL.md` |
-| Entrée Claude | `~/.claude/CLAUDE.md` |
-| Agents Claude | `~/.claude/agents/*.md` |
-| Skills Claude | `~/.claude/skills/*/SKILL.md` |
-| Ressources partagées et manifeste | `~/.forgeos/` |
+| Codex governance | `~/.codex/AGENTS.md` |
+| Codex agents | `~/.codex/agents/*.toml` |
+| Codex Skills | `~/.agents/skills/*/SKILL.md` |
+| Claude entrypoint | `~/.claude/CLAUDE.md` |
+| Claude agents | `~/.claude/agents/*.md` |
+| Claude Skills | `~/.claude/skills/*/SKILL.md` |
+| Gemini entrypoint | `~/.gemini/GEMINI.md` |
+| Antigravity governance | `~/.gemini/config/GEMINI.md` |
+| Antigravity agent discovery | `~/.gemini/config/agents.json` (-> `~/.gemini/antigravity-agents`) |
+| Antigravity Skill discovery | `~/.gemini/config/skills.json` (-> `~/.gemini/skills`) |
+| Gemini CLI agents | `~/.gemini/agents/*.md` |
+| Antigravity agents | `~/.gemini/antigravity-agents/*.md` |
+| Gemini / Antigravity Skills | `~/.gemini/skills/*/SKILL.md` |
+| Shared resources and manifest | `~/.forgeos/` |
 
-Le wrapper Claude global importe `~/.forgeos/AGENTS.md`. Les références contenues dans les agents sont rendues vers les Skills de la cible afin qu’elles ne dépendent pas du répertoire de travail courant.
+Global Claude and Gemini entrypoints (as well as `~/.gemini/config/GEMINI.md`) import `~/.forgeos/AGENTS.md`. Skill references inside agents are rendered to target paths so they do not depend on the current working directory.
 
-## Réglages optionnels
+## Optional settings
 
-Par défaut, l’installateur ne copie ni `.codex/config.toml` ni `.claude/settings.json`. Il évite ainsi de modifier implicitement le sandbox, les approbations, le niveau de raisonnement ou les permissions d’un utilisateur.
+By default, the installer does not copy `.codex/config.toml`, `.claude/settings.json`, or `.gemini/settings.json` (and `.gemini/policies/`). This avoids implicitly altering a user's sandboxing, approvals, reasoning level, or permissions.
 
-Pour les inclure après inspection :
+To include them after inspection:
 
 ```shell
 python3 scripts/forgeos.py install --tool all --scope global --include-settings
 ```
 
-L’option doit également être fournie lors d’une mise à jour de cette même installation. Un fichier de réglages préexistant reste protégé par la politique de conflit.
+This option must also be supplied when running `update` on that installation. Pre-existing settings files remain protected by the conflict policy.
 
-## Conflits et sauvegardes
+## Conflicts and backups
 
-Le comportement par défaut est transactionnel et conservateur : si un fichier prévu existe mais n’appartient pas au manifeste ForgeOS, la commande s’arrête avant d’écrire.
+Default behavior is transactional and conservative: if an expected destination exists and is not owned by the ForgeOS manifest, the command aborts before writing.
 
 ```shell
 python3 scripts/forgeos.py install --tool codex --scope local --target ./app
 ```
 
-Pour remplacer explicitement les collisions après sauvegarde :
+To explicitly replace collisions after backing them up:
 
 ```shell
 python3 scripts/forgeos.py install --tool codex --scope local --target ./app --conflict backup
 ```
 
-Les sauvegardes sont placées sous `.forgeos/backups/`. Lors de la désinstallation, ForgeOS restaure le fichier antérieur lorsqu’aucune modification ultérieure ne rend l’opération ambiguë. Les mises à jour créent également des instantanés de récupération avant de remplacer ou retirer des fichiers gérés.
+Backups are stored under `.forgeos/backups/`. On uninstall, ForgeOS restores the prior file whenever no later edits make restoration ambiguous. Updates also create recovery snapshots before replacing or removing managed files.
 
-N’utilisez pas `backup` comme substitut à une sauvegarde du projet ou du profil utilisateur.
+Do not treat `backup` as a substitute for project or user-profile backups.
 
-## Statut et dérive
+## Status and drift
 
 ```shell
 python3 scripts/forgeos.py status --tool all --scope global
 ```
 
-`status` compare les fichiers possédés avec leurs empreintes dans le manifeste. Un fichier manquant ou modifié est signalé comme dérive. La commande est en lecture seule.
+`status` compares owned files against their hashes in the manifest. Any missing or modified file is reported as drift. This command is read-only.
 
-Pour une installation locale :
+For a local installation:
 
 ```shell
 python3 scripts/forgeos.py status --tool all --scope local --target ./app
 ```
 
-## Mise à jour
+## Updating
 
 ```shell
 python3 scripts/forgeos.py update --tool all --scope global
 ```
 
-La mise à jour utilise les sources du checkout ForgeOS depuis lequel la commande est exécutée. Elle refuse par défaut d’écraser un fichier géré qui a été modifié. `--conflict backup` autorise explicitement sa sauvegarde puis son remplacement.
+`update` uses the ForgeOS checkout from which the command runs. By default it refuses to overwrite a managed file that has been modified locally. `--conflict backup` explicitly authorizes backing it up and replacing it.
 
-Inspectez le nouveau checkout et exécutez ses tests avant une mise à jour globale.
+Inspect the updated checkout and run its tests before performing a global update.
 
-## Désinstallation
+## Uninstalling
 
 ```shell
 python3 scripts/forgeos.py uninstall --tool all --scope global
 ```
 
-La désinstallation :
+Uninstallation:
 
-- ne traite que les chemins enregistrés dans le manifeste ;
-- ne supprime pas les fichiers applicatifs ou sentinelles extérieurs au manifeste ;
-- préserve un fichier ForgeOS modifié au lieu de le détruire ;
-- restaure une sauvegarde préexistante lorsque cela reste sûr ;
-- conserve le manifeste si des fichiers modifiés empêchent une désinstallation complète.
+- acts only on paths recorded in the manifest;
+- never deletes application or sentinel files outside the manifest;
+- preserves modified ForgeOS files instead of destroying them;
+- restores a pre-existing backup when safe to do so;
+- keeps the manifest if modified files prevent complete uninstallation.
 
-Les instantanés créés pendant une mise à jour peuvent contenir une modification utilisateur. Ils sont donc conservés sous `.forgeos/backups/` et leur nombre est affiché à la fin de la désinstallation. Après inspection ou archivage, leur suppression reste une décision manuelle.
+Snapshots created during an update may contain user edits. They are therefore retained under `.forgeos/backups/` and their count is printed at the end of uninstall. Removal after inspection or archival remains a manual decision.
 
-Après avoir examiné un fichier préservé, restaurez son contenu ForgeOS attendu ou déplacez-le manuellement, puis relancez la désinstallation.
+After reviewing a preserved file, restore its expected ForgeOS content or move it manually, then re-run `uninstall`.
 
-## Tests isolés
+## Isolated tests
 
-Les tests automatisés utilisent `tempfile.TemporaryDirectory` et une racine `--home` injectée. Ils ne doivent jamais viser le profil utilisateur réel.
+Automated tests use `tempfile.TemporaryDirectory` and an injected `--home` root. They must never target the real user profile.
 
 ```shell
 python3 -m unittest tests.test_installer -v
 ```
 
-Exemple de vérification manuelle isolée :
+Isolated manual check example:
 
 ### Windows PowerShell
 
@@ -177,7 +187,7 @@ python .\scripts\forgeos.py status --tool all --scope global --home $sandbox
 python .\scripts\forgeos.py uninstall --tool all --scope global --home $sandbox
 ```
 
-### macOS et Linux
+### macOS and Linux
 
 ```shell
 sandbox="$(mktemp -d)"
@@ -186,25 +196,25 @@ python3 ./scripts/forgeos.py status --tool all --scope global --home "$sandbox"
 python3 ./scripts/forgeos.py uninstall --tool all --scope global --home "$sandbox"
 ```
 
-Supprimez ensuite uniquement le répertoire temporaire que vous avez explicitement créé.
+Afterwards, remove only the temporary directory you explicitly created.
 
-## Validation du dépôt ForgeOS
+## Validating the ForgeOS repository
 
-Depuis la racine du dépôt source :
+From the root of the source checkout:
 
 ```shell
 python3 scripts/claude_adapter.py --check
+python3 scripts/gemini_adapter.py --check
 python3 scripts/bootstrap.py
 python3 tests/bootstrap.py
 python3 -m unittest tests.test_installer -v
 ```
 
-Les validations structurelles ne prouvent pas l’authentification, l’accès réseau ou les permissions distantes de Codex et Claude Code.
+Structural checks do not prove authentication, network access, or remote permissions for Codex, Claude Code, Antigravity, or Gemini CLI.
 
-## Dépannage sûr
+## Safe troubleshooting
 
-- `ForgeOS is not installed` : vérifiez la portée, la cible et le répertoire utilisateur effectif.
-- `existing files would be replaced` : inspectez les fichiers listés ; choisissez `backup` uniquement après avoir confirmé la collision.
-- `drift or conflicts` : comparez le fichier modifié avec la source ForgeOS avant toute sauvegarde ou mise à jour.
-- manifeste invalide : ne le recréez pas à la main ; restaurez-le depuis une sauvegarde fiable ou examinez les fichiers possédés avant une intervention manuelle.
-- erreur d’authentification Codex/Claude : utilisez les commandes officielles du CLI concerné ; ForgeOS ne gère pas les identifiants.
+- `ForgeOS is not installed`: verify scope, target path, and effective home directory.
+- `existing files would be replaced`: inspect the listed files; choose `backup` only after confirming the collision.
+- `drift or conflicts`: diff the modified file against the ForgeOS source before backing up or updating.
+- Invalid manifest: do not reconstruct it by hand; restore it from a trusted backup or inspect owned files before manual intervention.

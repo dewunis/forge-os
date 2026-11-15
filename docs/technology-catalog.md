@@ -7,6 +7,6 @@
 - Testing: Pest/PHPUnit, Vitest, Playwright, Jest, Maestro (select according to project).
 - Ops: Docker, GitHub Actions, Linux, Nginx/Caddy; cloud provider selected per project.
 - Observability: Sentry; Prometheus/Grafana when justified.
-- AI: OpenAI SDK, retrieval/RAG and vector stores only when needed.
+- AI: OpenAI SDK, Google GenAI SDK (Gemini API), retrieval/RAG and vector stores only when needed.
 
 These are **capabilities to support**, not installed tools. Stack profile selection must respect existing dependency versions and avoid automatic migrations/upgrades. React Native Reusables is not interchangeable with web shadcn/ui; apply platform-specific accessibility and interaction rules.

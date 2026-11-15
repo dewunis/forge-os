@@ -2,7 +2,7 @@
 
 ## Current phase: CTO + Product Manager/Business Analyst + Software Architect + Tech Lead + UI/UX Designer + Frontend Engineer + Backend Engineer + Mobile Engineer + Database Engineer + AI/LLM Engineer + Platform/DevOps Engineer + Reliability Engineer + Performance Engineer + Technical Writer/API Documentation Engineer + Release Manager + QA Engineer + Security Engineer + Code Reviewer
 
-`User -> Codex or Claude Code root session (CTO) -> Product Manager/Business Analyst for product clarification -> Software Architect for design -> UI/UX Designer for experience and interface contracts when needed -> Tech Lead for delivery coordination -> Frontend, Backend, Mobile, Database, AI/LLM, Platform/DevOps, Reliability, or Performance Engineer for scoped implementation and analysis -> QA Engineer for test evidence -> Security Engineer for authorized security assurance -> Technical Writer/API Documentation Engineer for verified technical and API documentation when needed -> Code Reviewer for independent review -> Release Manager for gated release preparation`. The 17 project-scoped role definitions are canonical in `.codex/agents/*.toml`. `scripts/claude_adapter.py` generates the equivalent native Claude Code definitions in `.claude/agents/*.md`; generated files are never edited directly. Small, already-clear requests may skip unnecessary roles.
+`User -> Codex, Claude Code, or Antigravity / Gemini CLI root session (CTO) -> Product Manager/Business Analyst for product clarification -> Software Architect for design -> UI/UX Designer for experience and interface contracts when needed -> Tech Lead for delivery coordination -> Frontend, Backend, Mobile, Database, AI/LLM, Platform/DevOps, Reliability, or Performance Engineer for scoped implementation and analysis -> QA Engineer for test evidence -> Security Engineer for authorized security assurance -> Technical Writer/API Documentation Engineer for verified technical and API documentation when needed -> Code Reviewer for independent review -> Release Manager for gated release preparation`. The 17 project-scoped role definitions are canonical in `.codex/agents/*.toml`. `scripts/claude_adapter.py` and `scripts/gemini_adapter.py` generate the equivalent native Claude Code, Gemini CLI, and Antigravity definitions in `.claude/agents/*.md`, `.gemini/agents/*.md` (Gemini CLI schema and tools), and `.gemini/antigravity-agents/*.md` (least-privilege `subagent`/`tools` frontmatter discovered via `.agents/agents.json` for Antigravity); generated files are never edited directly. Small, already-clear requests may skip unnecessary roles.
 
 ## Target organization (18 functions)
 
@@ -23,7 +23,7 @@ Small low-risk tasks skip unnecessary roles. Require independent review for crit
 
 ## Stack knowledge
 
-`profiles/*.yaml` declares preferred *technology families*. It is a human- and agent-readable catalog, not a native Codex or Claude Code feature. Target project lockfiles/manifests win over preferred versions; do not auto-upgrade or install. Reusable Skills are canonical in `.agents/skills/` and mirrored into `.claude/skills/` for Claude Code discovery.
+`profiles/*.yaml` declares preferred *technology families*. It is a human- and agent-readable catalog, not a native Codex, Claude Code, Antigravity, or Gemini CLI feature. Target project lockfiles/manifests win over preferred versions; do not auto-upgrade or install. Reusable Skills are canonical in `.agents/skills/` and mirrored into `.claude/skills/` and `.gemini/skills/` for Claude Code, Antigravity, and Gemini CLI discovery (with `.agents/agents.json` and `.agents/skills.json` manifests where needed).
 
 ## Concurrency
 
@@ -31,7 +31,7 @@ Default max open subagent threads = 3 when installed. Never delegate simultaneou
 
 ## Installation layer
 
-`scripts/forgeos.py` renders the repository sources into native Codex and/or Claude Code locations. Local installations use the target project; global installations use the current user's home directory and store shared ForgeOS resources under `~/.forgeos/`.
+`scripts/forgeos.py` renders the repository sources into native Codex, Claude Code, Gemini CLI, and/or Antigravity locations. Local installations use the target project (`.gemini/agents/`, `.gemini/antigravity-agents/`, `.agents/agents.json`, and when installed standalone `.agents/skills.json`); global installations use the current user's home directory (`~/.gemini/config/GEMINI.md`, `agents.json`, and `skills.json` alongside `~/.gemini/agents/` and `~/.gemini/antigravity-agents/`) and store shared ForgeOS resources under `~/.forgeos/`.
 
 The repository remains the source of truth. Installed files are tracked by `.forgeos/install-manifest.json` with content hashes and optional backup paths. An unmanaged collision or managed-file drift blocks mutation by default. Updates snapshot changed files before replacement, and uninstall removes only intact files recorded in the manifest. Tool settings that affect models, sandboxing, approvals, or permissions are opt-in through `--include-settings`.
 

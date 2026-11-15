@@ -7,9 +7,9 @@
     "status": "ready_for_github_actions"
   },
   "last_completed_mission": {
-    "id": "022",
-    "title": "Cross-platform documentation and installation",
+    "id": "027",
+    "title": "Fix multi-OS CI failures on Windows and macOS",
     "status": "completed"
   },
-  "updated_at": "2026-11-14T23:01:51Z"
+  "updated_at": "2026-11-15T12:29:00Z"
 }

@@ -1,0 +1,54 @@
+name: ForgeOS CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    name: Validate (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Check Claude adapter sync
+        run: python scripts/claude_adapter.py --check
+
+      - name: Check Gemini and Antigravity adapter sync
+        run: python scripts/gemini_adapter.py --check
+
+      - name: Run ForgeOS bootstrap validator
+        run: python scripts/bootstrap.py
+
+      - name: Run structural test suite
+        run: python tests/bootstrap.py
+
+      - name: Run isolated installer and adapter unit tests
+        run: python -m unittest tests.test_installer -v

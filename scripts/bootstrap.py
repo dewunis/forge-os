@@ -7,57 +7,261 @@ import tomllib
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def validate_claude_adapter(agent_files, skill_directories):
-    claude_root = ROOT / '.claude'
-    claude_instructions = (claude_root / 'CLAUDE.md').read_text(encoding='utf-8')
-    assert '@../AGENTS.md' in claude_instructions, 'Claude Code must import canonical AGENTS.md governance'
-    assert 'scripts/claude_adapter.py --check' in claude_instructions, 'Claude adapter sync check must be documented'
-
-    settings = json.loads((claude_root / 'settings.json').read_text(encoding='utf-8'))
-    assert settings['$schema'] == 'https://json.schemastore.org/claude-code-settings.json'
-    assert settings['permissions']['defaultMode'] == 'default'
-    assert 'model' not in settings, 'Claude settings must not override a model'
-    sensitive_commands = {
+def _sensitive_commands():
+    return {
         'git push', 'git merge', 'git tag', 'gh release', 'docker push',
         'npm publish', 'eas update', 'eas submit', 'terraform apply',
         'terraform destroy', 'kubectl apply', 'kubectl delete',
     }
-    expected_ask_rules = {
+
+
+def _expected_ask_rules():
+    return {
         f'{tool}({command} *)'
         for tool in ('Bash', 'PowerShell')
-        for command in sensitive_commands
+        for command in _sensitive_commands()
     }
-    assert set(settings['permissions']['ask']) == expected_ask_rules, 'Claude sensitive-command gates are incomplete'
+
+
+def _extract_frontmatter_tools(frontmatter: str) -> list[str]:
+    lines = frontmatter.splitlines()
+    tools: list[str] = []
+    in_tools = False
+    for line in lines:
+        if line.strip() == 'tools:':
+            in_tools = True
+            continue
+        if in_tools:
+            if line.startswith('  - '):
+                tools.append(line[4:].strip())
+            elif line and not line.startswith(' '):
+                break
+    return tools
+
+
+def _validate_claude_settings(settings_path: Path, expected_schema: str) -> None:
+    settings = json.loads(settings_path.read_text(encoding='utf-8'))
+    assert settings['$schema'] == expected_schema
+    assert settings['permissions']['defaultMode'] == 'default'
+    assert 'model' not in settings, 'Claude Code settings must not override a model'
+    assert set(settings['permissions']['ask']) == _expected_ask_rules(), (
+        'Claude Code sensitive-command gates are incomplete'
+    )
     assert settings['permissions']['deny'] == [
         'Read(.env)',
         'Read(.env.*)',
         'Read(!.env.example)',
         'Read(!.env.sample)',
         'Read(!.env.template)',
-    ], 'Claude must deny environment secrets while preserving public templates'
+    ], 'Claude Code must deny environment secrets while preserving public templates'
 
-    claude_agent_files = sorted((claude_root / 'agents').glob('*.md'))
-    assert {path.stem for path in claude_agent_files} == {path.stem for path in agent_files}, 'Claude and Codex agent sets must match'
+
+def validate_gemini_settings_and_policies(adapter_root: Path) -> None:
+    settings = json.loads((adapter_root / 'settings.json').read_text(encoding='utf-8'))
+    assert settings.get('$schema') == (
+        'https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json'
+    ), 'Gemini CLI settings must declare the official Gemini CLI schema'
+    assert 'model' not in settings, 'Gemini CLI settings must not override a model'
+    assert 'permissions' not in settings and 'contextFileName' not in settings, (
+        'Gemini CLI settings must use native Gemini CLI keys, not Claude Code permissions keys'
+    )
+    assert settings.get('context', {}).get('fileName') == [
+        'AGENTS.md',
+        'GEMINI.md',
+        '.gemini/GEMINI.md',
+    ], 'Gemini CLI settings must load canonical AGENTS.md and GEMINI.md via context.fileName'
+    assert settings.get('general', {}).get('defaultApprovalMode') == 'default', (
+        'Gemini CLI settings must keep general.defaultApprovalMode set to default'
+    )
+    assert settings.get('policyPaths') == ['.gemini/policies', '~/.gemini/policies'], (
+        'Gemini CLI settings must configure policyPaths for ForgeOS TOML policies'
+    )
+
+    policy_file = adapter_root / 'policies' / 'forgeos.toml'
+    assert policy_file.is_file(), 'Gemini CLI policy file .gemini/policies/forgeos.toml must exist'
+    rules = tomllib.loads(policy_file.read_text(encoding='utf-8')).get('rule', [])
+    assert isinstance(rules, list) and rules, 'Gemini CLI policy file must define [[rule]] entries'
+
+    ask_rules = [
+        rule for rule in rules
+        if rule.get('toolName') == 'run_shell_command' and rule.get('decision') == 'ask_user'
+    ]
+    assert ask_rules, 'Gemini CLI policy must include a run_shell_command ask_user rule'
+    configured_prefixes = {
+        prefix
+        for rule in ask_rules
+        for prefix in (
+            rule.get('commandPrefix')
+            if isinstance(rule.get('commandPrefix'), list)
+            else [rule.get('commandPrefix')]
+        )
+        if prefix
+    }
+    assert configured_prefixes == _sensitive_commands(), (
+        'Gemini CLI sensitive-command confirmation rules are incomplete'
+    )
+
+    denied_tools: set[str] = set()
+    allowed_template_read_tools: set[str] = set()
+    for rule in rules:
+        tools = rule.get('toolName')
+        tool_list = tools if isinstance(tools, list) else ([tools] if tools else [])
+        pattern = rule.get('argsPattern', '')
+        if rule.get('decision') == 'deny' and '.env' in pattern:
+            denied_tools.update(tool_list)
+        if rule.get('decision') == 'allow' and all(
+            ext in pattern for ext in ('example', 'sample', 'template')
+        ):
+            allowed_template_read_tools.update(tool_list)
+    assert {
+        'read_file',
+        'write_file',
+        'replace',
+        'read_many_files',
+        'grep_search',
+        'glob',
+        'run_shell_command',
+    } <= denied_tools, (
+        'Gemini CLI policy must deny .env secret file reads, searches, shell access, and writes'
+    )
+    assert {'read_file', 'read_many_files'} <= allowed_template_read_tools, (
+        'Gemini CLI policy must allow reading public .env template files'
+    )
+
+
+def _validate_markdown_adapter(
+    agent_files,
+    skill_directories,
+    *,
+    adapter_dir: str,
+    entry_file: str,
+    adapter_script: str,
+    label: str,
+):
+    adapter_root = ROOT / adapter_dir
+    instructions = (adapter_root / entry_file).read_text(encoding='utf-8')
+    assert '@../AGENTS.md' in instructions, f'{label} must import canonical AGENTS.md governance'
+    assert f'{adapter_script} --check' in instructions, f'{label} adapter sync check must be documented'
+
+    adapter_agent_files = sorted((adapter_root / 'agents').glob('*.md'))
+    assert {path.stem for path in adapter_agent_files} == {path.stem for path in agent_files}, (
+        f'{label} and Codex agent sets must match'
+    )
     for source in agent_files:
         config = tomllib.loads(source.read_text(encoding='utf-8'))
-        generated = (claude_root / 'agents' / f'{source.stem}.md').read_text(encoding='utf-8')
-        assert generated.startswith(f'---\nname: {source.stem}\n'), f'Invalid Claude frontmatter for {source.stem}'
-        assert '<!-- Generated by scripts/claude_adapter.py; do not edit directly. -->' in generated
+        generated = (adapter_root / 'agents' / f'{source.stem}.md').read_text(encoding='utf-8')
+        assert generated.startswith(f'---\nname: {source.stem}\n'), (
+            f'Invalid {label} frontmatter for {source.stem}'
+        )
+        assert f'<!-- Generated by {adapter_script}; do not edit directly. -->' in generated
         assert f'Canonical role source: `.codex/agents/{source.name}`.' in generated
-        assert config['developer_instructions'].strip() in generated, f'Stale Claude role: {source.stem}'
+        assert config['developer_instructions'].strip() in generated, f'Stale {label} role: {source.stem}'
 
     canonical_skill_files = {
         path.relative_to(ROOT / '.agents/skills'): path.read_bytes()
         for path in (ROOT / '.agents/skills').rglob('*')
         if path.is_file() and len(path.relative_to(ROOT / '.agents/skills').parts) > 1
     }
-    claude_skill_files = {
-        path.relative_to(claude_root / 'skills'): path.read_bytes()
-        for path in (claude_root / 'skills').rglob('*') if path.is_file()
+    adapter_skill_files = {
+        path.relative_to(adapter_root / 'skills'): path.read_bytes()
+        for path in (adapter_root / 'skills').rglob('*') if path.is_file()
     }
-    assert set(claude_skill_files) == set(canonical_skill_files), 'Claude Skill mirror structure is stale'
-    assert claude_skill_files == canonical_skill_files, 'Claude Skill mirror content is stale'
-    assert {path.name for path in skill_directories} == {path.parts[0] for path in claude_skill_files}, 'Claude Skill discovery set must match canonical Skills'
+    assert set(adapter_skill_files) == set(canonical_skill_files), (
+        f'{label} Skill mirror structure is stale'
+    )
+    assert adapter_skill_files == canonical_skill_files, f'{label} Skill mirror content is stale'
+    assert {path.name for path in skill_directories} == {path.parts[0] for path in adapter_skill_files}, (
+        f'{label} Skill discovery set must match canonical Skills'
+    )
+
+
+def validate_claude_adapter(agent_files, skill_directories):
+    _validate_claude_settings(
+        ROOT / '.claude' / 'settings.json',
+        'https://json.schemastore.org/claude-code-settings.json',
+    )
+    _validate_markdown_adapter(
+        agent_files,
+        skill_directories,
+        adapter_dir='.claude',
+        entry_file='CLAUDE.md',
+        adapter_script='scripts/claude_adapter.py',
+        label='Claude Code',
+    )
+
+
+def validate_gemini_adapter(agent_files, skill_directories):
+    validate_gemini_settings_and_policies(ROOT / '.gemini')
+    _validate_markdown_adapter(
+        agent_files,
+        skill_directories,
+        adapter_dir='.gemini',
+        entry_file='GEMINI.md',
+        adapter_script='scripts/gemini_adapter.py',
+        label='Gemini CLI',
+    )
+    agents_manifest = json.loads((ROOT / '.agents' / 'agents.json').read_text(encoding='utf-8'))
+    assert agents_manifest == {'entries': [{'path': '.gemini/antigravity-agents'}]}, (
+        '.agents/agents.json must register .gemini/antigravity-agents for Antigravity workspace discovery'
+    )
+    antigravity_agent_files = sorted((ROOT / '.gemini' / 'antigravity-agents').glob('*.md'))
+    assert {path.stem for path in antigravity_agent_files} == {path.stem for path in agent_files}, (
+        'Antigravity and Codex agent sets must match'
+    )
+    read_only_agents = {
+        'code-reviewer',
+        'product-manager',
+        'security-engineer',
+        'software-architect',
+        'tech-lead',
+        'ui-ux-designer',
+    }
+    expected_ag_read_only_tools = ['view_file', 'run_command', 'manage_task', 'search_web']
+    expected_ag_read_write_tools = [
+        'view_file',
+        'replace_file_content',
+        'write_to_file',
+        'run_command',
+        'manage_task',
+        'search_web',
+    ]
+    for source in agent_files:
+        config = tomllib.loads(source.read_text(encoding='utf-8'))
+        cli_generated = (ROOT / '.gemini' / 'agents' / f'{source.stem}.md').read_text(encoding='utf-8')
+        cli_frontmatter = cli_generated.split('\n---\n', 1)[0]
+        assert '\ntools:\n' in cli_frontmatter, f'Gemini CLI agent {source.stem} must declare tools'
+        assert (
+            'subagent:' not in cli_frontmatter
+            and 'mainAgent:' not in cli_frontmatter
+            and '\nskills:\n' not in cli_frontmatter
+        ), f'Gemini CLI agent {source.stem} must omit Antigravity-only frontmatter keys'
+        if source.stem in read_only_agents:
+            assert 'replace' not in cli_frontmatter and 'write_file' not in cli_frontmatter, (
+                f'Read-only Gemini CLI agent {source.stem} must not grant write tools'
+            )
+
+        ag_generated = (ROOT / '.gemini' / 'antigravity-agents' / f'{source.stem}.md').read_text(encoding='utf-8')
+        assert ag_generated.startswith(f'---\nname: {source.stem}\n'), (
+            f'Invalid Antigravity frontmatter for {source.stem}'
+        )
+        assert '<!-- Generated by scripts/gemini_adapter.py; do not edit directly. -->' in ag_generated
+        assert f'Canonical role source: `.codex/agents/{source.name}`.' in ag_generated
+        assert config['developer_instructions'].strip() in ag_generated, f'Stale Antigravity role: {source.stem}'
+        ag_frontmatter = ag_generated.split('\n---\n', 1)[0]
+        assert '\nsubagent: true\n' in ag_frontmatter, f'Antigravity agent {source.stem} must set subagent: true'
+        assert '\nmainAgent: false\n' in ag_frontmatter, f'Antigravity agent {source.stem} must set mainAgent: false'
+        assert '\ntools:\n' in ag_frontmatter, f'Antigravity agent {source.stem} must declare tools'
+        ag_tools = _extract_frontmatter_tools(ag_frontmatter)
+        if source.stem in read_only_agents:
+            assert ag_tools == expected_ag_read_only_tools, (
+                f'Read-only Antigravity agent {source.stem} must declare exact native tools '
+                f'{expected_ag_read_only_tools}, got {ag_tools}'
+            )
+        else:
+            assert ag_tools == expected_ag_read_write_tools, (
+                f'Implementation Antigravity agent {source.stem} must declare exact native tools '
+                f'{expected_ag_read_write_tools}, got {ag_tools}'
+            )
 
 def validate():
     config = tomllib.loads((ROOT / '.codex/config.toml').read_text(encoding='utf-8'))
@@ -72,6 +276,7 @@ def validate():
     agent_files = list((ROOT / '.codex/agents').glob('*.toml'))
     assert {p.name for p in agent_files} == {'ai-llm-engineer.toml', 'backend-engineer.toml', 'code-reviewer.toml', 'database-engineer.toml', 'frontend-engineer.toml', 'mobile-engineer.toml', 'performance-engineer.toml', 'platform-engineer.toml', 'product-manager.toml', 'qa-engineer.toml', 'release-manager.toml', 'reliability-engineer.toml', 'security-engineer.toml', 'software-architect.toml', 'tech-lead.toml', 'technical-writer.toml', 'ui-ux-designer.toml'}, 'Exactly the 17 implemented ForgeOS subagents must be installed'
     validate_claude_adapter(agent_files, skill_directories)
+    validate_gemini_adapter(agent_files, skill_directories)
     agent_configs = {p.name: tomllib.loads(p.read_text(encoding='utf-8')) for p in agent_files}
     architect = agent_configs['software-architect.toml']
     assert architect['name'] == 'software_architect'
@@ -198,7 +403,7 @@ def validate():
     assert not {'model', 'model_reasoning_effort', 'approval_policy', 'sandbox_mode'} & ai_llm_engineer.keys(), 'AI/LLM Engineer must inherit model and permissions'
     ai_llm_instructions = ai_llm_engineer['developer_instructions']
     assert '.agents/skills/ai-development/SKILL.md' in ai_llm_instructions, 'AI/LLM Engineer must use the canonical ai-development Skill'
-    assert all(term in ai_llm_instructions for term in ('OpenAI API', 'Responses API', 'Agents SDK', 'embeddings', 'RAG', 'vector search', 'tool calling', 'structured outputs', 'streaming')), 'AI/LLM Engineer must cover the required AI stack'
+    assert all(term in ai_llm_instructions for term in ('OpenAI API', 'Responses API', 'Agents SDK', 'Google Gemini API', 'Interactions API', 'Google GenAI SDK', 'embeddings', 'RAG', 'vector search', 'tool calling', 'structured outputs', 'streaming')), 'AI/LLM Engineer must cover the required AI stack'
     assert all(term in ai_llm_instructions for term in ('Laravel', 'Next.js', 'Expo', 'FastAPI', 'prompt injection', 'rate limits', 'observability', 'cost')), 'AI/LLM Engineer must cover framework integration, safety, reliability, and cost'
     ai_skill = ROOT / '.agents/skills/ai-development/SKILL.md'
     assert ai_skill.exists(), 'AI development Skill must be installed'
@@ -315,7 +520,7 @@ def validate():
     required = {'laravel-api','nextjs-web','expo-mobile','full-product'}
     available = {p.stem for p in (ROOT / 'profiles').glob('*.yaml')}
     assert required <= available, f'Missing stack profiles: {required - available}'
-    assert 'react-native-reusables' in (ROOT / 'profiles/expo-mobile.yaml').read_text()
+    assert 'react-native-reusables' in (ROOT / 'profiles/expo-mobile.yaml').read_text(encoding='utf-8')
     assert (ROOT / 'docs/permissions.md').exists()
     installer = ROOT / 'scripts/forgeos.py'
     installer_tests = ROOT / 'tests/test_installer.py'
@@ -323,11 +528,47 @@ def validate():
     assert installer_tests.exists(), 'Isolated installer tests must exist'
     installer_text = installer.read_text(encoding='utf-8')
     assert all(command in installer_text for command in ('install', 'update', 'uninstall', 'status')), 'Installer lifecycle commands must be present'
-    assert all(choice in installer_text for choice in ('codex', 'claude', 'all')), 'Installer tool selections must be present'
+    assert all(choice in installer_text for choice in ('codex', 'claude', 'gemini', 'all')), 'Installer tool selections must be present'
     assert 'tempfile' in installer_text and 'install-manifest.json' in installer_text, 'Installer must use atomic temporary writes and an ownership manifest'
     assert '.forgeos/' in (ROOT / '.gitignore').read_text(encoding='utf-8'), 'Local installer state must be ignored by Git'
     readme_text = (ROOT / 'README.md').read_text(encoding='utf-8')
-    assert all(heading in readme_text for heading in ('## Architecture', '## Agents', '## Skills', '## Installation', '## Sécurité', '## Limitations', '## Contribution')), 'README must cover the required professional sections'
+    assert all(heading in readme_text for heading in ('## Architecture', '## Agents', '## Skills', '## Installation', '## Security', '## Limitations', '## Contributing', 'README.fr.md')), 'English README must cover the required professional sections and link to README.fr.md'
+    readme_fr_path = ROOT / 'README.fr.md'
+    assert readme_fr_path.is_file(), 'French companion README.fr.md must exist'
+    readme_fr_text = readme_fr_path.read_text(encoding='utf-8')
+    assert all(heading in readme_fr_text for heading in ('## Architecture', '## Agents', '## Skills', '## Installation', '## Sécurité', '## Limitations', '## Contribution', 'README.md')), 'French README must cover the required professional sections and link to README.md'
+    for en_rel, fr_rel, en_link, fr_link in (
+        ('docs/installation.md', 'docs/installation.fr.md', 'installation.fr.md', 'installation.md'),
+        ('docs/release-process.md', 'docs/release-process.fr.md', 'release-process.fr.md', 'release-process.md'),
+        ('CHANGELOG.md', 'CHANGELOG.fr.md', 'CHANGELOG.fr.md', 'CHANGELOG.md'),
+    ):
+        en_path = ROOT / en_rel
+        fr_path = ROOT / fr_rel
+        assert en_path.is_file(), f'{en_rel} must exist'
+        assert fr_path.is_file(), f'{fr_rel} must exist'
+        assert en_link in en_path.read_text(encoding='utf-8'), f'{en_rel} must link to {en_link}'
+        assert fr_link in fr_path.read_text(encoding='utf-8'), f'{fr_rel} must link to {fr_link}'
+    ci_workflow = ROOT / '.github' / 'workflows' / 'ci.yml'
+    assert ci_workflow.is_file(), 'GitHub Actions CI workflow .github/workflows/ci.yml must exist'
+    ci_text = ci_workflow.read_text(encoding='utf-8')
+    assert all(
+        term in ci_text
+        for term in (
+            'permissions:\n  contents: read',
+            'persist-credentials: false',
+            'ubuntu-latest',
+            'macos-latest',
+            'windows-latest',
+            'scripts/claude_adapter.py --check',
+            'scripts/gemini_adapter.py --check',
+            'scripts/bootstrap.py',
+            'tests/bootstrap.py',
+            'tests.test_installer',
+        )
+    ), 'GitHub Actions CI workflow must enforce least privilege and run all ForgeOS validation checks across Linux, macOS, and Windows'
+    gitattributes = ROOT / '.gitattributes'
+    assert gitattributes.is_file(), '.gitattributes must exist to enforce LF line endings across OSes'
+    assert '* text=auto eol=lf' in gitattributes.read_text(encoding='utf-8'), '.gitattributes must enforce LF line endings with "* text=auto eol=lf"'
     state = json.loads((ROOT / '.ai/state.json').read_text(encoding='utf-8'))
     assert state['writer'] == 'cto', 'CTO must be the sole operational-state writer'
     activity_lines = [line for line in (ROOT / '.ai/activity.jsonl').read_text(encoding='utf-8').splitlines() if line]
@@ -335,8 +576,8 @@ def validate():
     assert all(json.loads(line)['writer'] == 'cto' for line in activity_lines), 'Only CTO activity entries are allowed'
     individual_reports = [p for p in (ROOT / '.ai/reports').glob('*.md') if p.name != 'report-template.md']
     assert not individual_reports, 'Per-mission Markdown reports are not allowed'
-    print('PASS: TOML and JSON parsed; 17 Codex and 17 synchronized Claude Code subagents, 16 canonical/mirrored Skills, profiles, governance, cross-platform installer, state and activity present.')
-    print('NOTE: Structural validation does not by itself prove Codex or Claude Code runtime behavior.')
+    print('PASS: TOML and JSON parsed; 17 Codex, 17 synchronized Claude Code, and 17 synchronized Gemini CLI subagents, 16 canonical/mirrored Skills, profiles, governance, cross-platform installer, state and activity present.')
+    print('NOTE: Structural validation does not by itself prove Codex, Claude Code, or Gemini CLI runtime behavior.')
 
 if __name__ == '__main__':
     validate()

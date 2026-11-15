@@ -18,7 +18,7 @@ from typing import Iterable
 SOURCE_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_VERSION = 1
 MANIFEST_NAME = "install-manifest.json"
-TOOLS = {"codex", "claude", "all"}
+TOOLS = {"codex", "claude", "gemini", "all"}
 
 
 class InstallError(RuntimeError):
@@ -31,7 +31,7 @@ def sha256(content: bytes) -> str:
 
 def selected_tools(value: str) -> tuple[str, ...]:
     if value == "all":
-        return ("codex", "claude")
+        return ("codex", "claude", "gemini")
     return (value,)
 
 
@@ -103,6 +103,10 @@ def safe_backup_destination(base: Path, relative: str) -> Path:
     return candidate
 
 
+def _non_codex_skill_dir(tools: tuple[str, ...]) -> str:
+    return ".claude/skills" if "claude" in tools else ".gemini/skills"
+
+
 def render_governance(
     content: bytes,
     base: Path,
@@ -112,21 +116,21 @@ def render_governance(
 ) -> bytes:
     if scope == "local":
         agent_reference = (
-            ".forgeos/sources/agents/*.toml"
-            if "claude" in tools and "codex" not in tools
-            else ".codex/agents/*.toml"
+            ".codex/agents/*.toml"
+            if "codex" in tools
+            else ".forgeos/sources/agents/*.toml"
         )
         skill_reference = (
-            ".claude/skills/*/SKILL.md"
-            if "claude" in tools and "codex" not in tools
-            else ".agents/skills/*/SKILL.md"
+            ".agents/skills/*/SKILL.md"
+            if "codex" in tools
+            else f"{_non_codex_skill_dir(tools)}/*/SKILL.md"
         )
         documentation_root = "docs"
         standards_root = "standards"
         profiles_root = "profiles/"
-    elif "claude" in tools and "codex" not in tools:
+    elif "codex" not in tools:
         agent_reference = f"{shared.as_posix()}/sources/agents/*.toml"
-        skill_reference = f"{base.as_posix()}/.claude/skills/*/SKILL.md"
+        skill_reference = f"{base.as_posix()}/{_non_codex_skill_dir(tools)}/*/SKILL.md"
         documentation_root = f"{shared.as_posix()}/docs"
         standards_root = f"{shared.as_posix()}/standards"
         profiles_root = f"{shared.as_posix()}/profiles/"
@@ -146,16 +150,72 @@ def render_governance(
             "standards/naming-conventions.md": f"{standards_root}/naming-conventions.md",
             "profiles/": profiles_root,
             (
-                "Do not edit generated Claude agent or Skill files directly; run "
-                "`python scripts/claude_adapter.py` and then `python "
-                "scripts/claude_adapter.py --check` after changing a canonical source."
+                "Do not edit generated Claude or Gemini agent or Skill files directly; run "
+                "`python scripts/claude_adapter.py` and `python scripts/gemini_adapter.py` "
+                "and then `python scripts/claude_adapter.py --check` and "
+                "`python scripts/gemini_adapter.py --check` after changing a canonical source."
             ): (
-                "Do not edit installed Claude agent or Skill files directly. "
+                "Do not edit installed Claude or Gemini agent or Skill files directly. "
                 "Update them from a validated ForgeOS source checkout with the "
                 "ForgeOS installer."
             ),
         },
     )
+
+
+def _render_adapter_entry(
+    content: bytes,
+    *,
+    adapter_dir: str,
+    adapter_script: str,
+    tool_label: str,
+    mirror_desc: str,
+    settings_label: str,
+    scope: str,
+    tool_only: bool,
+    source_agent_root: Path,
+    skill_root: Path,
+) -> bytes:
+    replacements = {
+        (
+            f"- Do not edit generated agent or Skill files directly. Update the "
+            f"canonical source, run `python {adapter_script}`, then run "
+            f"`python {adapter_script} --check`."
+        ): (
+            "- Do not edit installed agent or Skill files directly. Update them "
+            "from a validated ForgeOS source checkout with the ForgeOS installer."
+        ),
+        f"- {settings_label} settings are in `{adapter_dir}/settings.json`.": (
+            f"- {settings_label} settings are in `{adapter_dir}/settings.json` only when "
+            "the installer was run with `--include-settings`."
+        ),
+        (
+            "Gemini CLI Policy Engine rules for command confirmations and `.env` "
+            "protection live in `.gemini/policies/forgeos.toml`;"
+        ): (
+            "Gemini CLI Policy Engine rules for command confirmations and `.env` "
+            "protection live in `.gemini/policies/forgeos.toml` (also installed only "
+            "with `--include-settings`);"
+        ),
+    }
+    if scope == "global":
+        replacements["@../AGENTS.md"] = "@../.forgeos/AGENTS.md"
+    if tool_only:
+        replacements[
+            f"- `.codex/agents/*.toml` is the canonical source for the 17 specialist "
+            f"role definitions. `{adapter_dir}/agents/*.md` is generated from it."
+        ] = (
+            f"- The installed role provenance is `{source_agent_root.as_posix()}/*.toml`; "
+            "the ForgeOS repository remains the canonical source."
+        )
+        replacements[
+            f"- `.agents/skills/*/SKILL.md` is the canonical source for reusable "
+            f"procedures. `{adapter_dir}/skills/` is a generated {mirror_desc} mirror."
+        ] = (
+            f"- Installed {tool_label} Skills are in `{skill_root.as_posix()}/*/SKILL.md`; "
+            "the ForgeOS repository remains the canonical source."
+        )
+    return replace_text(content, replacements)
 
 
 def render_claude_entry(
@@ -166,38 +226,115 @@ def render_claude_entry(
     source_agent_root: Path,
     skill_root: Path,
 ) -> bytes:
+    return _render_adapter_entry(
+        content,
+        adapter_dir=".claude",
+        adapter_script="scripts/claude_adapter.py",
+        tool_label="Claude",
+        mirror_desc="Claude Code",
+        settings_label="Claude-specific",
+        scope=scope,
+        tool_only=claude_only,
+        source_agent_root=source_agent_root,
+        skill_root=skill_root,
+    )
+
+
+def render_gemini_entry(
+    content: bytes,
+    *,
+    scope: str,
+    gemini_only: bool,
+    source_agent_root: Path,
+    skill_root: Path,
+) -> bytes:
+    return _render_adapter_entry(
+        content,
+        adapter_dir=".gemini",
+        adapter_script="scripts/gemini_adapter.py",
+        tool_label="Gemini",
+        mirror_desc="Gemini CLI",
+        settings_label="Gemini-specific",
+        scope=scope,
+        tool_only=gemini_only,
+        source_agent_root=source_agent_root,
+        skill_root=skill_root,
+    )
+
+
+def _json_entries_manifest(entry_path: str) -> bytes:
+    return (json.dumps({"entries": [{"path": entry_path}]}, indent=2) + "\n").encode(
+        "utf-8"
+    )
+
+
+def _add_rendered_agents_dir(
+    plan: dict[Path, bytes],
+    *,
+    source_dir: Path,
+    dest_dir: Path,
+    scope: str,
+    skill_dir_rel: str,
+    skill_root: Path,
+    source_agent_root: Path,
+) -> None:
+    rendered_skill_root = skill_dir_rel if scope == "local" else skill_root.as_posix()
+    rendered_source_agent_root = (
+        ".forgeos/sources/agents"
+        if scope == "local"
+        else source_agent_root.as_posix()
+    )
     replacements = {
-        (
-            "- Do not edit generated agent or Skill files directly. Update the "
-            "canonical source, run `python scripts/claude_adapter.py`, then run "
-            "`python scripts/claude_adapter.py --check`."
-        ): (
-            "- Do not edit installed agent or Skill files directly. Update them "
-            "from a validated ForgeOS source checkout with the ForgeOS installer."
-        ),
-        "- Claude-specific settings are in `.claude/settings.json`.": (
-            "- Claude-specific settings are in `.claude/settings.json` only when "
-            "the installer was run with `--include-settings`."
+        ".agents/skills/": f"{rendered_skill_root}/",
+        "Canonical role source: `.codex/agents/": (
+            f"Canonical role source: `{rendered_source_agent_root}/"
         ),
     }
-    if scope == "global":
-        replacements["@../AGENTS.md"] = "@../.forgeos/AGENTS.md"
-    if claude_only:
-        replacements[
-            "- `.codex/agents/*.toml` is the canonical source for the 17 specialist "
-            "role definitions. `.claude/agents/*.md` is generated from it."
-        ] = (
-            f"- The installed role provenance is `{source_agent_root.as_posix()}/*.toml`; "
-            "the ForgeOS repository remains the canonical source."
-        )
-        replacements[
-            "- `.agents/skills/*/SKILL.md` is the canonical source for reusable "
-            "procedures. `.claude/skills/` is a generated Claude Code mirror."
-        ] = (
-            f"- Installed Claude Skills are in `{skill_root.as_posix()}/*/SKILL.md`; "
-            "the ForgeOS repository remains the canonical source."
-        )
-    return replace_text(content, replacements)
+    for source in files_below(source_dir):
+        plan[dest_dir / source.name] = replace_text(source.read_bytes(), replacements)
+
+
+def _add_markdown_adapter_to_plan(
+    plan: dict[Path, bytes],
+    *,
+    tool_name: str,
+    entry_filename: str,
+    renderer,
+    args: argparse.Namespace,
+    base: Path,
+    shared: Path,
+    tools: tuple[str, ...],
+) -> None:
+    adapter_rel = f".{tool_name}"
+    adapter_root = base / adapter_rel
+    skill_root = adapter_root / "skills"
+    source_agent_root = shared / "sources" / "agents"
+    entry_content = renderer(
+        (SOURCE_ROOT / adapter_rel / entry_filename).read_bytes(),
+        scope=args.scope,
+        source_agent_root=source_agent_root,
+        skill_root=skill_root,
+        **(
+            {"claude_only": "codex" not in tools}
+            if tool_name == "claude"
+            else {"gemini_only": "codex" not in tools}
+        ),
+    )
+    plan[adapter_root / entry_filename] = entry_content
+    _add_rendered_agents_dir(
+        plan,
+        source_dir=SOURCE_ROOT / adapter_rel / "agents",
+        dest_dir=adapter_root / "agents",
+        scope=args.scope,
+        skill_dir_rel=f"{adapter_rel}/skills",
+        skill_root=skill_root,
+        source_agent_root=source_agent_root,
+    )
+    add_tree(plan, SOURCE_ROOT / ".agents" / "skills", skill_root)
+    if args.include_settings:
+        plan[adapter_root / "settings.json"] = (
+            SOURCE_ROOT / adapter_rel / "settings.json"
+        ).read_bytes()
 
 
 def build_plan(args: argparse.Namespace, base: Path, shared: Path) -> dict[Path, bytes]:
@@ -213,14 +350,14 @@ def build_plan(args: argparse.Namespace, base: Path, shared: Path) -> dict[Path,
     add_tree(plan, SOURCE_ROOT / "profiles", resource_root / "profiles")
     add_tree(plan, SOURCE_ROOT / "standards", resource_root / "standards")
     canonical_skill_root = (
-        base / ".claude" / "skills"
-        if "claude" in tools and "codex" not in tools
-        else base / ".agents" / "skills"
+        base / ".agents" / "skills"
+        if "codex" in tools
+        else base / _non_codex_skill_dir(tools)
     )
     canonical_skill_prefix = (
-        ".claude/skills/"
-        if args.scope == "local" and "claude" in tools and "codex" not in tools
-        else ".agents/skills/"
+        ".agents/skills/"
+        if args.scope == "local" and "codex" in tools
+        else f"{_non_codex_skill_dir(tools)}/"
         if args.scope == "local"
         else f"{canonical_skill_root.as_posix()}/"
     )
@@ -251,41 +388,64 @@ def build_plan(args: argparse.Namespace, base: Path, shared: Path) -> dict[Path,
             ).read_bytes()
 
     if "claude" in tools:
-        claude_root = base / ".claude"
-        skill_root = claude_root / "skills"
-        source_agent_root = shared / "sources" / "agents"
-        claude_entry = render_claude_entry(
-            (SOURCE_ROOT / ".claude" / "CLAUDE.md").read_bytes(),
-            scope=args.scope,
-            claude_only="codex" not in tools,
-            source_agent_root=source_agent_root,
-            skill_root=skill_root,
+        _add_markdown_adapter_to_plan(
+            plan,
+            tool_name="claude",
+            entry_filename="CLAUDE.md",
+            renderer=render_claude_entry,
+            args=args,
+            base=base,
+            shared=shared,
+            tools=tools,
         )
-        plan[claude_root / "CLAUDE.md"] = claude_entry
-        rendered_skill_root = (
-            ".claude/skills" if args.scope == "local" else skill_root.as_posix()
+
+    if "gemini" in tools:
+        _add_markdown_adapter_to_plan(
+            plan,
+            tool_name="gemini",
+            entry_filename="GEMINI.md",
+            renderer=render_gemini_entry,
+            args=args,
+            base=base,
+            shared=shared,
+            tools=tools,
         )
-        rendered_source_agent_root = (
-            ".forgeos/sources/agents"
-            if args.scope == "local"
-            else source_agent_root.as_posix()
-        )
-        for source in files_below(SOURCE_ROOT / ".claude" / "agents"):
-            content = replace_text(
-                source.read_bytes(),
-                {
-                    ".agents/skills/": f"{rendered_skill_root}/",
-                    "Canonical role source: `.codex/agents/": (
-                        f"Canonical role source: `{rendered_source_agent_root}/"
-                    ),
-                },
-            )
-            plan[claude_root / "agents" / source.name] = content
-        add_tree(plan, SOURCE_ROOT / ".agents" / "skills", skill_root)
+        gemini_root = base / ".gemini"
         if args.include_settings:
-            plan[claude_root / "settings.json"] = (
-                SOURCE_ROOT / ".claude" / "settings.json"
-            ).read_bytes()
+            add_tree(
+                plan,
+                SOURCE_ROOT / ".gemini" / "policies",
+                gemini_root / "policies",
+            )
+        _add_rendered_agents_dir(
+            plan,
+            source_dir=SOURCE_ROOT / ".gemini" / "antigravity-agents",
+            dest_dir=gemini_root / "antigravity-agents",
+            scope=args.scope,
+            skill_dir_rel=".gemini/skills",
+            skill_root=gemini_root / "skills",
+            source_agent_root=shared / "sources" / "agents",
+        )
+        if args.scope == "local":
+            plan[base / ".agents" / "agents.json"] = _json_entries_manifest(
+                ".gemini/antigravity-agents"
+            )
+            if "codex" not in tools:
+                plan[base / ".agents" / "skills.json"] = _json_entries_manifest(
+                    ".gemini/skills"
+                )
+        else:
+            config_root = gemini_root / "config"
+            plan[config_root / "GEMINI.md"] = replace_text(
+                plan[gemini_root / "GEMINI.md"],
+                {"@../.forgeos/AGENTS.md": "@../../.forgeos/AGENTS.md"},
+            )
+            plan[config_root / "agents.json"] = _json_entries_manifest(
+                (gemini_root / "antigravity-agents").as_posix()
+            )
+            plan[config_root / "skills.json"] = _json_entries_manifest(
+                (gemini_root / "skills").as_posix()
+            )
 
     return plan
 
@@ -321,7 +481,7 @@ def read_manifest(base: Path) -> dict[str, object]:
         raise InstallError(f"invalid ForgeOS manifest scope: {path}")
     tools = data.get("tools")
     if not isinstance(tools, list) or not tools or any(
-        tool not in {"codex", "claude"} for tool in tools
+        tool not in {"codex", "claude", "gemini"} for tool in tools
     ):
         raise InstallError(f"invalid ForgeOS manifest tools: {path}")
     for relative, entry in data["files"].items():
